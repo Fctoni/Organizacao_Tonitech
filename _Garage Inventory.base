@@ -1,0 +1,64 @@
+filters:
+  and:
+    - note.status != null
+properties:
+  file.name:
+    displayName: Item
+  note.shelf:
+    displayName: Shelf
+  note.box:
+    displayName: Box
+  note.qty:
+    displayName: Qty
+  note.minimum_safe_stock:
+    displayName: Min
+  note.category:
+    displayName: Category
+  note.status:
+    displayName: Status
+views:
+  - type: table
+    name: All items
+    filters:
+      and:
+        - note.status != "out"
+    order:
+      - file.name
+      - shelf
+      - box
+      - qty
+      - minimum_safe_stock
+      - status
+      - category
+    sort: []
+  - type: table
+    name: By category
+    groupBy:
+      property: category
+      direction: ASC
+    order:
+      - file.name
+      - shelf
+      - box
+      - qty
+      - status
+  - type: table
+    name: Low stock
+    filters:
+      and:
+        - note.qty < note.minimum_safe_stock
+    order:
+      - file.name
+      - qty
+      - minimum_safe_stock
+      - shelf
+      - box
+  - type: table
+    name: Out of stock
+    filters:
+      and:
+        - note.status == "out"
+    order:
+      - file.name
+      - shelf
+      - box

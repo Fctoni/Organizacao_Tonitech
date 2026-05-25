@@ -1,0 +1,7 @@
+# Obsidian — estado de UI volátil e código de plugin de terceiros
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/plugins/
+
+# SO
+.DS_Store
