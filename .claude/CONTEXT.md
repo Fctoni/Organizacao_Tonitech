@@ -31,6 +31,8 @@ exactly one Category. Canonical values:
   bench power supplies, signal generators. Distinct from *Tools* (hand/power tools that
   shape or fasten) and from *Electronics* (components wired into a circuit) — an
   Instrument measures or sources signals for testing, it isn't a circuit component.
+- **Groceries** — consumable food and pantry staples stored in the garage (flour,
+  pet food, and the like). Distinct from *Household* (durable non-food home goods).
 - **Uncategorized** — the catch-all.
 
 The **Electronics × Hardware** boundary is the one to get right: *Electronics* is a

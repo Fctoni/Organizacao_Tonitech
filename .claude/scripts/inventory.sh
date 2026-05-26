@@ -30,7 +30,7 @@ PLACE_RE = re.compile(r"^[BW][0-9]{2,}$")
 # Controlled vocabulary for Category — mirror of CONTEXT.md (single source of truth).
 CANONICAL_CATEGORIES = ("Electronics", "Cables", "Hardware", "Tools",
                         "Lighting", "Computers", "Household", "Safety",
-                        "Instruments", "Uncategorized")
+                        "Instruments", "Groceries", "Uncategorized")
 
 USAGE = """inventory.sh — garage inventory interface
 
