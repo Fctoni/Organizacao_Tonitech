@@ -92,6 +92,18 @@ if run new --note "USB Cable 1m" --shelf 1 --box 1 --qty 1 2>/dev/null; then
 else
   ok "dup rejected"
 fi
+if run new --note "Bad Cat Item" --shelf 1 --box 1 --qty 1 --category Bogus 2>/dev/null; then
+  bad "new accepted non-canonical category"
+else
+  ok "new rejects non-canonical category"
+fi
+[ ! -f "$TMP/Bad Cat Item.md" ] && ok "new aborts before writing on bad category" || bad "new wrote file despite bad category"
+err=$(run new --note "Bad Cat Item 2" --shelf 1 --box 1 --qty 1 --category Bogus 2>&1 >/dev/null)
+if echo "$err" | grep -q "CONTEXT.md" && echo "$err" | grep -q "ASK THE USER"; then
+  ok "rejection message directs the agent (read CONTEXT.md / ask user)"
+else
+  bad "rejection message is not directive"
+fi
 
 echo "== fuzzy write refused =="
 if run take --note "esp32" --n 1 2>/dev/null; then

@@ -38,6 +38,8 @@ WRITES (print resulting item as JSON object; target EXACT note name):
   add  --note NAME --n N         increment qty by N (status back to in_stock)
   new  --note NAME --shelf S --box B --qty Q [--min M]
        [--category C] [--aliases "a,b,c"]   create a new item note
+                                            (C must be in the controlled vocabulary;
+                                             defaults to Uncategorized)
   set-category --note NAME --category C    change an item's category
                                            (C must be in the controlled vocabulary)
 
@@ -196,6 +198,15 @@ def need_int(flags, key):
     except ValueError:
         die(f"--{key} must be an integer, got '{flags[key]}'")
 
+def validate_category(category):
+    if category not in CANONICAL_CATEGORIES:
+        die(f"category '{category}' is not in the controlled vocabulary "
+            f"({', '.join(CANONICAL_CATEGORIES)}). "
+            f"DO NOT invent a category. First read .claude/CONTEXT.md and reuse a "
+            f"canonical value if one fits. If none fits, ASK THE USER to approve a new "
+            f"category before proceeding — and on approval add it to BOTH CONTEXT.md "
+            f"and the CANONICAL_CATEGORIES tuple in inventory.sh, then retry.")
+
 # ---------- dispatch ----------
 args = sys.argv[1:]
 if not args or args[0] in ("-h", "--help", "help"):
@@ -246,6 +257,7 @@ elif cmd == "new":
     qty = need_int(flags, "qty")
     minimum = int(flags["min"]) if "min" in flags else 0
     category = flags.get("category", "Uncategorized")
+    validate_category(category)
     aliases = parse_aliases(flags.get("aliases", ""))
     al = "[" + ", ".join(aliases) + "]" if aliases else "[]"
     body = (f"---\nshelf: {shelf}\nbox: {box}\nqty: {qty}\n"
@@ -262,9 +274,7 @@ elif cmd == "set-category":
     if "category" not in flags:
         die("set-category requires --category C")
     category = flags["category"]
-    if category not in CANONICAL_CATEGORIES:
-        die(f"category '{category}' is not in the controlled vocabulary "
-            f"({', '.join(CANONICAL_CATEGORIES)})")
+    validate_category(category)
     path = resolve_exact(flags["note"])
     rewrite_category(path, category)
     print(json.dumps(record(parse(path)), ensure_ascii=False))

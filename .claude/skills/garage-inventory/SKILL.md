@@ -54,6 +54,8 @@ Returns items where `qty < minimum_safe_stock`.
 ### New item (does NOT exist) — ASK FIRST, then create
 1. Run `find` to confirm it isn't already tracked.
 2. Ask the user for **category**, **aliases**, **minimum_safe_stock** (suggest defaults).
+   `category` MUST be a canonical value from `.claude/CONTEXT.md` — the script rejects
+   anything else and its error tells you what to do (read the glossary / ask the user).
 3. Confirm **shelf + box + qty**, then:
 ```bash
 "$SCRIPT" new --note "USB Cable 1m" --shelf 3 --box 2 --qty 8 \

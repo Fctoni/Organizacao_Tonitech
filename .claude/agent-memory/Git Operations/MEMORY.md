@@ -4,13 +4,14 @@
 - Data: 2026-05-26
 - Versão: — (sem versionamento adotado)
 - Branch: main
-- Alterações: população do inventário (13 itens novos), consolidação da taxonomia (8 categorias canônicas), subcomando `set-category` no `inventory.sh` + testes, e sync da memória de contexto
+- Alterações: backstop de categoria no `inventory.sh` (`new`/`set-category` rejeitam categoria fora do vocabulário, com mensagem auto-diretiva) + 3 testes, docs (CONTEXT/SKILL), 3 notas Sonoff, sync da memória de contexto
 
 ## Histórico de versões
 | Data | Versão | Branch | Alterações | Status |
 |------|--------|--------|------------|--------|
 | 2026-05-24 | — | main | Commit inicial: estrutura `.claude/` (skill, scripts, CONTEXT, ADRs, memória contexto), notas de itens, Base e dashboard | Concluído |
 | 2026-05-26 | — | main | Inventário populado (13 itens novos), ~17 categorias ad-hoc → 8 canônicas, `set-category` + 5 testes (22 verdes), `CONTEXT.md`/`SKILL.md` atualizados, memória de contexto sincronizada | Concluído |
+| 2026-05-26 | — | main | Backstop de categoria: `new`/`set-category` rejeitam valor fora do vocabulário com mensagem auto-diretiva (+3 testes, 25 verdes); 3 notas Sonoff (S33); docs e memória sincronizadas | Concluído |
 
 ## Padrões observados
 - **Versionamento:** confirmado SEM versionamento (`vX.Y.Z`) — segundo commit também sem prefixo. Manter commits sem versão salvo orientação contrária do usuário.

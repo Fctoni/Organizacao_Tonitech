@@ -34,8 +34,11 @@ signal/circuit component; *Hardware* is a mechanical/fluid/power actuator. A **r
 — whether a bare electromechanical component (e.g. Songle SRD) or a driver module — is
 Electronics; a solenoid **valve** or a **pump** is Hardware.
 
-Title Case. Extend this list deliberately (record the addition here) — don't coin a
-category ad hoc.
+Title Case. Extend this list deliberately — don't coin a category ad hoc. The script
+**enforces** this vocabulary: `inventory.sh new` and `set-category` reject any value
+outside it. To add a category you must update **both** this list **and** the
+`CANONICAL_CATEGORIES` tuple in `.claude/scripts/inventory.sh` (this glossary is the
+source of truth; the tuple mirrors it).
 _Avoid_: type, kind, group, tag (a "tag" would be multi-valued; Category is single).
 
 **Aliases**:
