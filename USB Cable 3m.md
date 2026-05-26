@@ -1,6 +1,6 @@
 ---
 shelf: 2
-box: 4
+place: B04
 qty: 0
 minimum_safe_stock: 0
 category: Cables

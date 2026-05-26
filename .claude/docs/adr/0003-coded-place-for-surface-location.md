@@ -19,8 +19,13 @@ read *on demand* from the prefix — it is **not** stored as a field (this diffe
 - The canonical stored value is always the normalized, zero-padded form: position 3 is
   always `B03`, never `B3`. The script normalizes on write so equality and display are
   unambiguous.
-- An unknown prefix (e.g. `X01`) or a malformed value fails validation rather than
-  parsing silently — a deliberate trade for losing integer typing on `box`.
+- The contract is the regex `^[BW][0-9]{2,}$`, held in the script (`PLACE_RE`). Writes
+  *compose* the code from a validated integer, so the script never **produces** an
+  invalid place. Reads do not trust the stored value blindly: a note whose `place` is
+  malformed (e.g. a hand-edit like `X01` or `caixa 9`) is surfaced — `find`/`list`/
+  `low-stock` emit a non-fatal warning to stderr (the row still prints), and a
+  single-note write attaches a `place_warning`. So a corrupt place is flagged, not
+  parsed silently — a deliberate trade for losing integer typing on `box`.
 
 ## Considered options
 
@@ -55,10 +60,14 @@ read *on demand* from the prefix — it is **not** stored as a field (this diffe
   string sort is a known, accepted limitation (a garage shelf is unlikely to exceed 99
   positions on a Surface).
 - **All mutation of `place` goes through the script (ADR-0002), including
-  relocation.** `place` is written by `new` and by a `relocate` subcommand — both take
-  exactly one of `--box N` / `--wall N` (N ≥ 1); passing both, or neither, is an error;
-  the script composes and normalizes the code. Items physically move between box and
-  wall, so relocation is in scope precisely so the operator never hand-edits frontmatter.
+  relocation.** `place` is written by `new` and by a `relocate` subcommand. Both take
+  exactly one of `--box N` / `--wall N` (N ≥ 1); passing both, or neither, is an error.
+  `relocate` **also requires `--shelf`** — every relocate restates the *full* location
+  (shelf + place), even when a value is unchanged (`B05` → `B05`). This is deliberate:
+  it forbids an implicit shelf-only move that would leave the place undeclared, forcing
+  the operator (or agent) to state the place explicitly each time. Items physically move
+  between box and wall, so relocation is in scope precisely so nobody hand-edits
+  frontmatter.
 - **Migration is a one-time sanctioned script routine, not a hand-edit.** It reads each
   legacy `box: N` and rewrites it to `place: B<zero-padded N>` (so `box: 12` → `B12`,
   not `B012`), guarded by `test-inventory.sh`. After migration the script knows only

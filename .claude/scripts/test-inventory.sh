@@ -133,8 +133,8 @@ else
 fi
 [ ! -f "$TMP/Both Surfaces.md" ] && [ ! -f "$TMP/No Surface.md" ] && ok "rejected new items leave no file" || bad "rejected new wrote a file"
 
-echo "== relocate =="
-out=$(run relocate --note "M3 Screws 10mm" --wall 5)
+echo "== relocate (full location required every time) =="
+out=$(run relocate --note "M3 Screws 10mm" --shelf 2 --wall 5)
 [ "$(echo "$out" | field place)" = "W05" ] && ok "relocate to wall: place W05" || bad "relocate wall place"
 grep -q '^place: W05$' "$TMP/M3 Screws 10mm.md" && ok "relocate persists place" || bad "relocate persist"
 grep -q '^qty: 50$' "$TMP/M3 Screws 10mm.md" && ok "relocate preserves qty" || bad "relocate clobbered qty"
@@ -142,12 +142,26 @@ grep -q '^# M3 Screws 10mm$' "$TMP/M3 Screws 10mm.md" && ok "relocate preserves 
 out=$(run relocate --note "M3 Screws 10mm" --box 7 --shelf 4)
 [ "$(echo "$out" | field place)" = "B07" ] && ok "relocate to box: place B07" || bad "relocate box place"
 [ "$(echo "$out" | field shelf)" = "4" ] && ok "relocate --shelf moves shelf" || bad "relocate shelf"
-if run relocate --note "M3 Screws 10mm" --box 1 --wall 1 2>/dev/null; then
+# move only the shelf, but the place MUST still be restated (B07 -> B07)
+out=$(run relocate --note "M3 Screws 10mm" --shelf 8 --box 7)
+[ "$(echo "$out" | field shelf)" = "8" ] && [ "$(echo "$out" | field place)" = "B07" ] \
+  && ok "relocate restates unchanged place while moving shelf" || bad "relocate shelf-only restate"
+if run relocate --note "M3 Screws 10mm" --box 7 2>/dev/null; then
+  bad "relocate accepted missing --shelf"
+else
+  ok "relocate requires --shelf (no shelf-only-implicit move)"
+fi
+if run relocate --note "M3 Screws 10mm" --shelf 1 2>/dev/null; then
+  bad "relocate accepted missing surface"
+else
+  ok "relocate requires a place (--box/--wall) even with --shelf"
+fi
+if run relocate --note "M3 Screws 10mm" --shelf 1 --box 1 --wall 1 2>/dev/null; then
   bad "relocate accepted both --box and --wall"
 else
   ok "relocate rejects both --box and --wall"
 fi
-if run relocate --note "Ghost Item" --box 1 2>/dev/null; then
+if run relocate --note "Ghost Item" --shelf 1 --box 1 2>/dev/null; then
   bad "relocate accepted missing note"
 else
   ok "relocate rejects non-existent note"
@@ -200,6 +214,48 @@ echo "$mig2" | python3 -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 i
 grep -q '^place: B03$' "$TMP/ESP32 DevKit V1.md" >/dev/null 2>&1
 echo "$mig" | python3 -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if any(s["note"]=="ESP32 DevKit V1" for s in d["skipped"]) else 1)' \
   && ok "migrate skips notes that already have place" || bad "migrate touched a place note"
+
+echo "== malformed place (read warns, never dies; write flags) =="
+cat > "$TMP/Corrupt Place.md" <<'EOF'
+---
+shelf: 5
+place: caixa 9
+qty: 1
+minimum_safe_stock: 0
+category: Tools
+aliases: []
+status: in_stock
+---
+
+# Corrupt Place
+EOF
+list_err=$(run list 2>&1 >/dev/null)
+echo "$list_err" | grep -q "malformed place" && ok "read emits malformed-place warning (stderr)" || bad "no malformed warning on read"
+run list >/dev/null 2>&1 && ok "read still succeeds despite malformed place" || bad "malformed place broke read"
+[ "$(run list 2>/dev/null | rows)" -ge 1 ] && ok "malformed-place note still listed (non-fatal)" || bad "malformed note dropped"
+out=$(run add --note "Corrupt Place" --n 1 2>/dev/null)
+echo "$out" | grep -q '"place_warning"' && ok "single-note write flags pre-existing malformed place" || bad "write did not flag malformed place"
+
+echo "== migrate strips orphan box when place already present =="
+cat > "$TMP/Both Fields.md" <<'EOF'
+---
+shelf: 7
+place: B01
+box: 9
+qty: 1
+minimum_safe_stock: 0
+category: Tools
+aliases: []
+status: in_stock
+---
+
+# Both Fields
+EOF
+mig3=$(run migrate)
+grep -q '^box:' "$TMP/Both Fields.md" && bad "migrate left orphan box" || ok "migrate strips orphan box (place authoritative)"
+grep -q '^place: B01$' "$TMP/Both Fields.md" && ok "migrate keeps authoritative place" || bad "migrate clobbered place"
+echo "$mig3" | python3 -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if any(c["note"]=="Both Fields" for c in d["cleaned"]) else 1)' \
+  && ok "migrate reports the cleaned note" || bad "migrate cleaned report"
 
 echo "---"
 echo "$pass passed, $fail failed"

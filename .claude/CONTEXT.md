@@ -81,7 +81,8 @@ zero-padded to ≥ 2 digits (e.g. `B03`, `W12`); numbers are ≥ 1. An Item has 
 one Place. `place` itself is a stored field; the **Surface** is *derived* from its
 prefix on read, never stored separately.
 _Avoid_: using "Place" for the whole Location (Place is only the in-Shelf spot;
-Location = Shelf + Place); spot, bin, slot, position.
+Location = Shelf + Place); spot, bin, slot. ("Position" is the accepted word for the
+number within a Surface — e.g. "Wall position 3".)
 
 **Quantity** (`qty`):
 The number of units of an Item currently on hand. Changed only via Take and Add.

@@ -1,6 +1,6 @@
 ---
 shelf: 2
-box: 1
+place: B01
 qty: 7
 minimum_safe_stock: 4
 category: Lighting

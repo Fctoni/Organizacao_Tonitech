@@ -58,9 +58,11 @@ them and let the user pick.
    script rejects duplicate names.
 
 ### Relocate — "I moved the drill to the wall"
-Items physically move between boxes and the wall. Use `relocate` to change an Item's
-Place (and optionally its Shelf) — it is the sanctioned path; never hand-edit the
-frontmatter.
+Items physically move between boxes and the wall. Use `relocate` (the sanctioned path;
+never hand-edit). It **restates the full location every time**: always pass `--shelf`
+AND exactly one of `--box` / `--wall`, even if one value is unchanged (`B05` → `B05`).
+There is no shelf-only move — you must declare the place explicitly so it can't be left
+ambiguous.
 
 ### Recategorize — "this should be Hardware, not Electronics"
 Resolve the exact name via `find`, then `set-category`. It rewrites only `category`

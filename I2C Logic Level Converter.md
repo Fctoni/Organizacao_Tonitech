@@ -1,6 +1,6 @@
 ---
 shelf: 1
-box: 1
+place: B01
 qty: 10
 minimum_safe_stock: 3
 category: Electronics

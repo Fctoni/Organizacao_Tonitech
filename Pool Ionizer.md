@@ -1,6 +1,6 @@
 ---
 shelf: 43
-box: 2
+place: B02
 qty: 1
 minimum_safe_stock: 0
 category: Household

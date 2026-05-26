@@ -17,11 +17,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export VAULT_DIR="${VAULT_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 python3 - "$@" <<'PY'
-import sys, os, json, glob, unicodedata
+import sys, os, json, glob, unicodedata, re
 
 VAULT = os.environ["VAULT_DIR"]
 DASHBOARD = "Inventory Dashboard.md"
 FIELDS_INT = ("shelf", "qty", "minimum_safe_stock")
+# A place is a coded spot: B<n> for a box, W<n> for a wall position, zero-padded to
+# >=2 digits. Writes compose it from a validated int (so the script never *produces*
+# an invalid place); this pattern is the contract reads check against so a malformed
+# value (e.g. a hand-edit) is surfaced rather than trusted silently.
+PLACE_RE = re.compile(r"^[BW][0-9]{2,}$")
 # Controlled vocabulary for Category — mirror of CONTEXT.md (single source of truth).
 CANONICAL_CATEGORIES = ("Electronics", "Cables", "Hardware", "Tools",
                         "Lighting", "Computers", "Household", "Safety",
@@ -42,8 +47,10 @@ WRITES (print resulting item as JSON object; target EXACT note name):
                                             (pass exactly one of --box / --wall;
                                              C must be in the controlled vocabulary,
                                              defaults to Uncategorized)
-  relocate --note NAME (--box B | --wall W) [--shelf S]
-                                 move an item to a new place (and optionally shelf)
+  relocate --note NAME --shelf S (--box B | --wall W)
+                                 move an item; restate the FULL location every time —
+                                 --shelf and one of --box/--wall are both required,
+                                 even if a value is unchanged (forces an explicit place)
   set-category --note NAME --category C    change an item's category
                                            (C must be in the controlled vocabulary)
   migrate                        one-time: rewrite legacy `box: N` to a coded
@@ -109,6 +116,28 @@ def parse(path):
 def record(rec):
     return {k: rec[k] for k in
             ("note", "shelf", "place", "qty", "minimum_safe_stock", "category", "status")}
+
+def malformed_place(place):
+    """A place is malformed when present but not matching the contract. Composed
+    writes are always valid, so this only ever fires on hand-edited/corrupt notes."""
+    return place is not None and not PLACE_RE.match(place)
+
+def warn_malformed(recs):
+    """Reads must not trust a stored place silently: emit a non-fatal warning to
+    stderr for every record whose place is malformed. The TSV (stdout) still prints."""
+    for r in recs:
+        if malformed_place(r["place"]):
+            sys.stderr.write(json.dumps(
+                {"warning": f"note '{r['note']}' has a malformed place '{r['place']}' "
+                            f"(expected B<n>/W<n>, e.g. B03)"}) + "\n")
+
+def attach_place_warning(out):
+    """Single-note writes flag (not fail) a pre-existing malformed place so the
+    operator sees the corruption. Kept on its own key to never clobber other warnings."""
+    if malformed_place(out.get("place")):
+        out["place_warning"] = (f"place '{out['place']}' is malformed "
+                                 f"(expected B<n>/W<n>, e.g. B03)")
+    return out
 
 # Reads emit TSV: keys stated once in the header, then one row per item.
 # Leaner than JSON for a flat list and still trivially parseable. Writes stay JSON.
@@ -269,14 +298,19 @@ cmd, rest = args[0], args[1:]
 if cmd == "find":
     if not rest:
         die("find needs a query")
-    print(tsv(record(r) for r in find_matches(" ".join(rest))))
+    recs = [record(r) for r in find_matches(" ".join(rest))]
+    warn_malformed(recs)
+    print(tsv(recs))
 
 elif cmd == "list":
-    print(tsv(record(parse(p)) for p in item_paths()))
+    recs = [record(parse(p)) for p in item_paths()]
+    warn_malformed(recs)
+    print(tsv(recs))
 
 elif cmd == "low-stock":
-    recs = (record(parse(p)) for p in item_paths())
+    recs = [record(parse(p)) for p in item_paths()]
     recs = [r for r in recs if r["qty"] is not None and r["qty"] < (r["minimum_safe_stock"] or 0)]
+    warn_malformed(recs)
     print(tsv(recs))
 
 elif cmd in ("take", "add"):
@@ -293,6 +327,7 @@ elif cmd in ("take", "add"):
     out = record(parse(path))
     if cmd == "take" and n > cur:
         out["warning"] = f"requested {n} but only {cur} on hand; floored at 0"
+    attach_place_warning(out)
     print(json.dumps(out, ensure_ascii=False))
 
 elif cmd == "new":
@@ -330,24 +365,28 @@ elif cmd == "set-category":
     validate_category(category)
     path = resolve_exact(flags["note"])
     rewrite_category(path, category)
-    print(json.dumps(record(parse(path)), ensure_ascii=False))
+    print(json.dumps(attach_place_warning(record(parse(path))), ensure_ascii=False))
 
 elif cmd == "relocate":
+    # Every relocate restates the FULL location: --shelf and exactly one of
+    # --box / --wall are both required, even when a value is unchanged (B05 -> B05).
+    # This forces the place to be declared explicitly — you can't move only the shelf
+    # and silently leave the place ambiguous.
     flags = get_flags(rest)
     if "note" not in flags:
         die("relocate requires --note NAME")
     path = resolve_exact(flags["note"])
-    updates = {"place": place_from_flags(flags)}
-    if "shelf" in flags:
-        updates["shelf"] = str(need_int_min(flags, "shelf", 1))
-    rewrite_fields(path, updates)
+    shelf = need_int_min(flags, "shelf", 1)   # required
+    place = place_from_flags(flags)            # required: exactly one of --box/--wall
+    rewrite_fields(path, {"shelf": str(shelf), "place": place})
     print(json.dumps(record(parse(path)), ensure_ascii=False))
 
 elif cmd == "migrate":
     # One-time: rewrite the legacy integer `box: N` field to a coded `place`
     # (zero-padded to >=2 digits, e.g. box: 12 -> B12; never B012).
-    # Idempotent — notes that already carry `place` are left untouched.
-    migrated, skipped = [], []
+    # Idempotent — notes that already carry `place` are left untouched, except that
+    # a leftover legacy `box:` line is stripped (place is authoritative).
+    migrated, cleaned, skipped = [], [], []
     for p in item_paths():
         base = os.path.splitext(os.path.basename(p))[0]
         with open(p, encoding="utf-8") as f:
@@ -357,7 +396,18 @@ elif cmd == "migrate":
             skipped.append({"note": base, "reason": "no frontmatter"}); continue
         keys = [lines[i].split(":", 1)[0].strip() for i in range(start, end)]
         if "place" in keys:
-            skipped.append({"note": base, "reason": "already has place"}); continue
+            if "box" in keys:
+                # already on the place schema but carries an orphan legacy box: drop it
+                del lines[start + keys.index("box")]
+                out = "\n".join(lines)
+                if not out.endswith("\n"):
+                    out += "\n"
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(out)
+                cleaned.append({"note": base, "reason": "removed orphan box field"})
+            else:
+                skipped.append({"note": base, "reason": "already has place"})
+            continue
         if "box" not in keys:
             skipped.append({"note": base, "reason": "no box field"}); continue
         i = start + keys.index("box")
@@ -376,7 +426,8 @@ elif cmd == "migrate":
         with open(p, "w", encoding="utf-8") as f:
             f.write(out)
         migrated.append({"note": base, "place": code})
-    print(json.dumps({"migrated": migrated, "skipped": skipped}, ensure_ascii=False))
+    print(json.dumps({"migrated": migrated, "cleaned": cleaned, "skipped": skipped},
+                     ensure_ascii=False))
 
 else:
     die(f"unknown subcommand '{cmd}' (try --help)")
