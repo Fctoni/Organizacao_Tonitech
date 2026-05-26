@@ -3,7 +3,7 @@ shelf: 1
 box: 1
 qty: 1
 minimum_safe_stock: 0
-category: Microcontrollers
+category: Electronics
 aliases: [arduino pro mini, pro mini]
 status: in_stock
 ---

@@ -22,6 +22,9 @@ import sys, os, json, glob, unicodedata
 VAULT = os.environ["VAULT_DIR"]
 DASHBOARD = "Inventory Dashboard.md"
 FIELDS_INT = ("shelf", "box", "qty", "minimum_safe_stock")
+# Controlled vocabulary for Category — mirror of CONTEXT.md (single source of truth).
+CANONICAL_CATEGORIES = ("Electronics", "Cables", "Hardware", "Tools",
+                        "Lighting", "Computers", "Household", "Safety", "Uncategorized")
 
 USAGE = """inventory.sh — garage inventory interface
 
@@ -35,6 +38,8 @@ WRITES (print resulting item as JSON object; target EXACT note name):
   add  --note NAME --n N         increment qty by N (status back to in_stock)
   new  --note NAME --shelf S --box B --qty Q [--min M]
        [--category C] [--aliases "a,b,c"]   create a new item note
+  set-category --note NAME --category C    change an item's category
+                                           (C must be in the controlled vocabulary)
 
 Resolve a fuzzy phrase with `find` first, then call take/add on the exact name.
 """
@@ -150,6 +155,26 @@ def rewrite_qty(path, new_qty):
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
 
+def rewrite_category(path, new_category):
+    """Line-level rewrite of the category field, preserving everything else."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    fm, start, end, lines = split_frontmatter(text)
+    if fm is None:
+        die(f"note '{os.path.basename(path)}' has no frontmatter")
+    saw_category = False
+    for i in range(start, end):
+        key = lines[i].split(":", 1)[0].strip()
+        if key == "category":
+            lines[i] = f"category: {new_category}"; saw_category = True
+    if not saw_category:
+        lines.insert(end, f"category: {new_category}")
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
 # ---------- argument helpers ----------
 def get_flags(args):
     flags, i = {}, 0
@@ -228,6 +253,20 @@ elif cmd == "new":
             f"aliases: {al}\nstatus: {status_for(qty)}\n---\n\n# {name}\n")
     with open(path, "w", encoding="utf-8") as f:
         f.write(body)
+    print(json.dumps(record(parse(path)), ensure_ascii=False))
+
+elif cmd == "set-category":
+    flags = get_flags(rest)
+    if "note" not in flags:
+        die("set-category requires --note NAME")
+    if "category" not in flags:
+        die("set-category requires --category C")
+    category = flags["category"]
+    if category not in CANONICAL_CATEGORIES:
+        die(f"category '{category}' is not in the controlled vocabulary "
+            f"({', '.join(CANONICAL_CATEGORIES)})")
+    path = resolve_exact(flags["note"])
+    rewrite_category(path, category)
     print(json.dumps(record(parse(path)), ensure_ascii=False))
 
 else:

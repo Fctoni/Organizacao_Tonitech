@@ -3,7 +3,7 @@ shelf: 1
 box: 1
 qty: 4
 minimum_safe_stock: 0
-category: Sensors
+category: Electronics
 aliases: [am2302, dht22, temperature humidity sensor, humidity sensor]
 status: in_stock
 ---

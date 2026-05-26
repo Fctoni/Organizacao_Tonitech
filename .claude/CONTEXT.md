@@ -15,9 +15,27 @@ _Avoid_: product, unit, piece, SKU (a "unit"/"piece" is one of the things an Ite
 
 **Category**:
 The single bucket an Item belongs to, from a controlled vocabulary. One Item has
-exactly one Category. Canonical values: **Electronics**, **Hardware**, **Cables**,
-**Tools**, plus **Uncategorized** as the catch-all. Title Case. Extend this list
-deliberately (record the addition here) — don't coin a category ad hoc.
+exactly one Category. Canonical values:
+
+- **Electronics** — signal/logic-level components and modules you wire into a circuit:
+  boards, sensors, relay modules, level shifters, DACs, micro switches, connectors, servos.
+- **Cables** — conductors of any gauge: USB cables, power wires (e.g. 4mm/6mm).
+- **Hardware** — mechanical / power-electromechanical / fluid parts: valves, pumps, fasteners.
+  Acts on the physical world, not on a circuit.
+- **Tools** — hand and power tools.
+- **Lighting** — bulbs and luminaires.
+- **Computers** — PC parts and peripherals (e.g. CPU coolers).
+- **Household** — non-workshop home goods: coolers, small appliances, storage containers.
+- **Safety** — PPE and protective equipment.
+- **Uncategorized** — the catch-all.
+
+The **Electronics × Hardware** boundary is the one to get right: *Electronics* is a
+signal/circuit component; *Hardware* is a mechanical/fluid/power actuator. A **relay**
+— whether a bare electromechanical component (e.g. Songle SRD) or a driver module — is
+Electronics; a solenoid **valve** or a **pump** is Hardware.
+
+Title Case. Extend this list deliberately (record the addition here) — don't coin a
+category ad hoc.
 _Avoid_: type, kind, group, tag (a "tag" would be multi-valued; Category is single).
 
 **Aliases**:
@@ -34,6 +52,9 @@ _Avoid_: place, spot, bin, position.
 
 **Quantity** (`qty`):
 The number of units of an Item currently on hand. Changed only via Take and Add.
+For **bulk continuous** Items (e.g. wire/cable sold by length), `qty` counts the
+natural unit of measure — **metres**, not pieces — and Take/Add operate in metres
+(`take --n 3` = "took 3 m"). Likewise Minimum Safe Stock for such Items is in metres.
 _Avoid_: count, amount, stock (reserve "stock" for the threshold terms below).
 
 **Minimum Safe Stock** (`minimum_safe_stock`):

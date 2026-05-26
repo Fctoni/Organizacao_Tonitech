@@ -61,6 +61,15 @@ Returns items where `qty < minimum_safe_stock`.
 ```
 The script rejects duplicate names. Never create silently.
 
+### Recategorize — "this should be Hardware, not Electronics"
+Resolve the exact name via `find`, then:
+```bash
+"$SCRIPT" set-category --note "Songle SRD-12VDC-SL-C Relay" --category Electronics
+```
+Rewrites only the `category` field (body and other fields preserved). The script
+**rejects** any category outside the controlled vocabulary in `.claude/CONTEXT.md`.
+This is the ONLY sanctioned way to change a category — never hand-edit the frontmatter.
+
 ## Conventions & decisions
 - Domain language (Item, Category, Location, Take/Add, …) → `.claude/CONTEXT.md` (glossary).
 - Why the design is the way it is → `.claude/docs/adr/` (TSV-reads/JSON-writes, script-mediated mutation).

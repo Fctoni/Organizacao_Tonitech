@@ -100,6 +100,18 @@ else
   ok "non-exact name rejected"
 fi
 
+echo "== set-category =="
+out=$(run set-category --note "M3 Screws 10mm" --category Tools)
+[ "$(echo "$out" | field category)" = "Tools" ] && ok "set-category changes category" || bad "set-category value"
+[ "$(run find screws | col category)" = "Tools" ] && ok "set-category persists" || bad "set-category persist"
+grep -q '^# M3 Screws 10mm$' "$TMP/M3 Screws 10mm.md" && ok "set-category preserves body" || bad "set-category body lost"
+grep -q '^qty: 50$' "$TMP/M3 Screws 10mm.md" && ok "set-category preserves other fields" || bad "set-category clobbered qty"
+if run set-category --note "M3 Screws 10mm" --category Bogus 2>/dev/null; then
+  bad "non-canonical category accepted"
+else
+  ok "non-canonical category rejected"
+fi
+
 echo "---"
 echo "$pass passed, $fail failed"
 [ "$fail" = "0" ]
