@@ -1,7 +1,7 @@
 ---
 shelf: 33
 box: 1
-qty: 1
+qty: 2
 minimum_safe_stock: 0
 category: Electronics
 aliases: [t2us2c, sonoff, interruptor inteligente, smart switch, 2 canais, 2 gang, tasmota]

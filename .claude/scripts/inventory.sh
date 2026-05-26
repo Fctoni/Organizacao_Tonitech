@@ -21,10 +21,11 @@ import sys, os, json, glob, unicodedata
 
 VAULT = os.environ["VAULT_DIR"]
 DASHBOARD = "Inventory Dashboard.md"
-FIELDS_INT = ("shelf", "box", "qty", "minimum_safe_stock")
+FIELDS_INT = ("shelf", "qty", "minimum_safe_stock")
 # Controlled vocabulary for Category — mirror of CONTEXT.md (single source of truth).
 CANONICAL_CATEGORIES = ("Electronics", "Cables", "Hardware", "Tools",
-                        "Lighting", "Computers", "Household", "Safety", "Uncategorized")
+                        "Lighting", "Computers", "Household", "Safety",
+                        "Instruments", "Uncategorized")
 
 USAGE = """inventory.sh — garage inventory interface
 
@@ -36,13 +37,20 @@ READS (print TSV: header row + one row per item):
 WRITES (print resulting item as JSON object; target EXACT note name):
   take --note NAME --n N         decrement qty by N (floors at 0 -> status out)
   add  --note NAME --n N         increment qty by N (status back to in_stock)
-  new  --note NAME --shelf S --box B --qty Q [--min M]
+  new  --note NAME --shelf S (--box B | --wall W) --qty Q [--min M]
        [--category C] [--aliases "a,b,c"]   create a new item note
-                                            (C must be in the controlled vocabulary;
+                                            (pass exactly one of --box / --wall;
+                                             C must be in the controlled vocabulary,
                                              defaults to Uncategorized)
+  relocate --note NAME (--box B | --wall W) [--shelf S]
+                                 move an item to a new place (and optionally shelf)
   set-category --note NAME --category C    change an item's category
                                            (C must be in the controlled vocabulary)
+  migrate                        one-time: rewrite legacy `box: N` to a coded
+                                 `place` (zero-padded, e.g. box: 12 -> B12)
 
+A `place` is a coded spot on a shelf: B<n> for a box, W<n> for a wall position,
+zero-padded to >=2 digits (B03, W12). Positions and shelves are >= 1 (no zero).
 Resolve a fuzzy phrase with `find` first, then call take/add on the exact name.
 """
 
@@ -80,7 +88,7 @@ def parse(path):
         text = f.read()
     fm, _, _, _ = split_frontmatter(text)
     rec = {"note": os.path.splitext(os.path.basename(path))[0], "path": path,
-           "shelf": None, "box": None, "qty": None, "minimum_safe_stock": 0,
+           "shelf": None, "place": None, "qty": None, "minimum_safe_stock": 0,
            "category": None, "aliases": [], "status": None}
     if fm is None:
         return rec
@@ -94,18 +102,18 @@ def parse(path):
             except ValueError: pass
         elif key == "aliases":
             rec[key] = parse_aliases(val)
-        elif key in ("category", "status"):
+        elif key in ("category", "status", "place"):
             rec[key] = val or None
     return rec
 
 def record(rec):
     return {k: rec[k] for k in
-            ("note", "shelf", "box", "qty", "minimum_safe_stock", "category", "status")}
+            ("note", "shelf", "place", "qty", "minimum_safe_stock", "category", "status")}
 
 # Reads emit TSV: keys stated once in the header, then one row per item.
 # Leaner than JSON for a flat list and still trivially parseable. Writes stay JSON.
-TSV_COLS = ("note", "shelf", "box", "qty", "minimum_safe_stock", "category", "status")
-TSV_HEADER = ("note", "shelf", "box", "qty", "min", "category", "status")
+TSV_COLS = ("note", "shelf", "place", "qty", "minimum_safe_stock", "category", "status")
+TSV_HEADER = ("note", "shelf", "place", "qty", "min", "category", "status")
 
 def tsv(recs):
     rows = ["\t".join(TSV_HEADER)]
@@ -207,6 +215,49 @@ def validate_category(category):
             f"category before proceeding — and on approval add it to BOTH CONTEXT.md "
             f"and the CANONICAL_CATEGORIES tuple in inventory.sh, then retry.")
 
+def need_int_min(flags, key, minimum):
+    v = need_int(flags, key)
+    if v < minimum:
+        die(f"--{key} must be >= {minimum}, got {v}")
+    return v
+
+def place_from_flags(flags):
+    """Compose a normalized place code from exactly one of --box / --wall.
+
+    `place` is the only Location field besides `shelf`: B<n> for a box, W<n> for a
+    wall position, zero-padded to >=2 digits. The Surface (box vs wall) is encoded in
+    the prefix and read back from it — never stored separately.
+    """
+    has_box, has_wall = "box" in flags, "wall" in flags
+    if has_box and has_wall:
+        die("pass exactly one of --box / --wall, not both")
+    if not (has_box or has_wall):
+        die("pass exactly one of --box / --wall")
+    key = "box" if has_box else "wall"
+    n = need_int_min(flags, key, 1)
+    return f"{'B' if has_box else 'W'}{n:02d}"
+
+def rewrite_fields(path, updates):
+    """Update the given frontmatter fields in place, inserting any missing ones just
+    before the closing fence. `updates` maps field name -> stringified value."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    fm, start, end, lines = split_frontmatter(text)
+    if fm is None:
+        die(f"note '{os.path.basename(path)}' has no frontmatter")
+    seen = set()
+    for i in range(start, end):
+        key = lines[i].split(":", 1)[0].strip()
+        if key in updates:
+            lines[i] = f"{key}: {updates[key]}"; seen.add(key)
+    for off, key in enumerate(k for k in updates if k not in seen):
+        lines.insert(end + off, f"{key}: {updates[key]}")
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
 # ---------- dispatch ----------
 args = sys.argv[1:]
 if not args or args[0] in ("-h", "--help", "help"):
@@ -252,15 +303,17 @@ elif cmd == "new":
     path = os.path.join(VAULT, name + ".md")
     if os.path.exists(path):
         die(f"item '{name}' already exists")
-    shelf = need_int(flags, "shelf")
-    box = need_int(flags, "box")
+    shelf = need_int_min(flags, "shelf", 1)
+    place = place_from_flags(flags)
     qty = need_int(flags, "qty")
-    minimum = int(flags["min"]) if "min" in flags else 0
+    if qty < 0:
+        die("--qty must be >= 0")
+    minimum = need_int_min(flags, "min", 0) if "min" in flags else 0
     category = flags.get("category", "Uncategorized")
     validate_category(category)
     aliases = parse_aliases(flags.get("aliases", ""))
     al = "[" + ", ".join(aliases) + "]" if aliases else "[]"
-    body = (f"---\nshelf: {shelf}\nbox: {box}\nqty: {qty}\n"
+    body = (f"---\nshelf: {shelf}\nplace: {place}\nqty: {qty}\n"
             f"minimum_safe_stock: {minimum}\ncategory: {category}\n"
             f"aliases: {al}\nstatus: {status_for(qty)}\n---\n\n# {name}\n")
     with open(path, "w", encoding="utf-8") as f:
@@ -278,6 +331,52 @@ elif cmd == "set-category":
     path = resolve_exact(flags["note"])
     rewrite_category(path, category)
     print(json.dumps(record(parse(path)), ensure_ascii=False))
+
+elif cmd == "relocate":
+    flags = get_flags(rest)
+    if "note" not in flags:
+        die("relocate requires --note NAME")
+    path = resolve_exact(flags["note"])
+    updates = {"place": place_from_flags(flags)}
+    if "shelf" in flags:
+        updates["shelf"] = str(need_int_min(flags, "shelf", 1))
+    rewrite_fields(path, updates)
+    print(json.dumps(record(parse(path)), ensure_ascii=False))
+
+elif cmd == "migrate":
+    # One-time: rewrite the legacy integer `box: N` field to a coded `place`
+    # (zero-padded to >=2 digits, e.g. box: 12 -> B12; never B012).
+    # Idempotent — notes that already carry `place` are left untouched.
+    migrated, skipped = [], []
+    for p in item_paths():
+        base = os.path.splitext(os.path.basename(p))[0]
+        with open(p, encoding="utf-8") as f:
+            text = f.read()
+        fm, start, end, lines = split_frontmatter(text)
+        if fm is None:
+            skipped.append({"note": base, "reason": "no frontmatter"}); continue
+        keys = [lines[i].split(":", 1)[0].strip() for i in range(start, end)]
+        if "place" in keys:
+            skipped.append({"note": base, "reason": "already has place"}); continue
+        if "box" not in keys:
+            skipped.append({"note": base, "reason": "no box field"}); continue
+        i = start + keys.index("box")
+        raw = lines[i].split(":", 1)[1].strip()
+        try:
+            n = int(raw)
+        except ValueError:
+            skipped.append({"note": base, "reason": f"box not an integer: '{raw}'"}); continue
+        if n < 1:
+            skipped.append({"note": base, "reason": f"box < 1: {n}"}); continue
+        code = f"B{n:02d}"
+        lines[i] = f"place: {code}"
+        out = "\n".join(lines)
+        if not out.endswith("\n"):
+            out += "\n"
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(out)
+        migrated.append({"note": base, "place": code})
+    print(json.dumps({"migrated": migrated, "skipped": skipped}, ensure_ascii=False))
 
 else:
     die(f"unknown subcommand '{cmd}' (try --help)")

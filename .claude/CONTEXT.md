@@ -27,6 +27,10 @@ exactly one Category. Canonical values:
 - **Computers** — PC parts and peripherals (e.g. CPU coolers).
 - **Household** — non-workshop home goods: coolers, small appliances, storage containers.
 - **Safety** — PPE and protective equipment.
+- **Instruments** — bench test & measurement equipment: oscilloscopes, multimeters,
+  bench power supplies, signal generators. Distinct from *Tools* (hand/power tools that
+  shape or fasten) and from *Electronics* (components wired into a circuit) — an
+  Instrument measures or sources signals for testing, it isn't a circuit component.
 - **Uncategorized** — the catch-all.
 
 The **Electronics × Hardware** boundary is the one to get right: *Electronics* is a
@@ -48,10 +52,36 @@ and carry no grouping meaning.
 _Avoid_: tags, labels, synonyms-as-categories.
 
 **Location**:
-Where an Item is stored, given as a (**Shelf**, **Box**) pair. Shelf and Box are
-integers. Box numbering restarts on each Shelf, so the full address is always both
-numbers together — Shelf 1 / Box 3 is a different Box from Shelf 2 / Box 3.
-_Avoid_: place, spot, bin, position.
+Where an Item is stored, given as a (**Shelf**, **Place**) pair. The Shelf is an
+integer (≥ 1); the Place names a spot on one of the Shelf's two **Surfaces**. The
+address is always both together — Place numbering restarts on each Shelf, so
+Shelf 1 / B03 is a different spot from Shelf 2 / B03.
+_Avoid_: collapsing Shelf and Place into one field; "address" as a stored value.
+
+**Surface**:
+One of the two kinds of spot a Shelf offers: a **Box** or the **Wall**. Every Item
+sits on exactly one Surface. The Box↔Wall distinction is *physical placement*, not a
+Category — a Tool may live in a Box and an Electronics module may hang on the Wall.
+
+**Box**:
+An opaque container on a Shelf, identified by a number. One of the two Surfaces.
+Because a Box hides its contents, it needs an index to be found at all.
+_Avoid_: bin, container, drawer.
+
+**Wall**:
+The visible panel of a Shelf where Items are hung or clamped, with numbered
+positions. The other Surface alongside Box. Box and Wall numbering are *independent*
+per Shelf — B03 and W03 on the same Shelf are different spots.
+_Avoid_: pegboard, panel, rack, hook (those are the physical object; Wall is the term).
+
+**Place** (`place`):
+The second component of a Location: the Surface plus its number on a Shelf, written
+as a single code — `B` + number for a Box, `W` + number for a Wall position,
+zero-padded to ≥ 2 digits (e.g. `B03`, `W12`); numbers are ≥ 1. An Item has exactly
+one Place. `place` itself is a stored field; the **Surface** is *derived* from its
+prefix on read, never stored separately.
+_Avoid_: using "Place" for the whole Location (Place is only the in-Shelf spot;
+Location = Shelf + Place); spot, bin, slot, position.
 
 **Quantity** (`qty`):
 The number of units of an Item currently on hand. Changed only via Take and Add.
