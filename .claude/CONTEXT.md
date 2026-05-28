@@ -43,7 +43,7 @@ Electronics; a solenoid **valve** or a **pump** is Hardware.
 Title Case. Extend this list deliberately — don't coin a category ad hoc. The script
 **enforces** this vocabulary: `inventory.sh new` and `set-category` reject any value
 outside it. To add a category you must update **both** this list **and** the
-`CANONICAL_CATEGORIES` tuple in `.claude/scripts/inventory.sh` (this glossary is the
+`CANONICAL_CATEGORIES` tuple in `.claude/scripts/inventory.py` (this glossary is the
 source of truth; the tuple mirrors it).
 _Avoid_: type, kind, group, tag (a "tag" would be multi-valued; Category is single).
 

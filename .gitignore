@@ -5,3 +5,7 @@
 
 # SO
 .DS_Store
+
+# Python — bytecode de inventory.py / testes (gerado ao importar/rodar)
+__pycache__/
+*.pyc
