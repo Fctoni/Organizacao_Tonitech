@@ -1,5 +1,5 @@
 ---
-shelf: 33
+shelf: 23
 place: B12
 qty: 1
 minimum_safe_stock: 0

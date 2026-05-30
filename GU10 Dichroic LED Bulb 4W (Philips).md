@@ -1,7 +1,7 @@
 ---
 shelf: 2
 place: B01
-qty: 7
+qty: 8
 minimum_safe_stock: 4
 category: Lighting
 aliases: [dicroica, gu10, philips, lampada, dichroic]

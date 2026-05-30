@@ -1,7 +1,7 @@
 ---
-shelf: 33
+shelf: 23
 place: B11
-qty: 3
+qty: 4
 minimum_safe_stock: 0
 category: Electronics
 aliases: [t2us3c, sonoff, interruptor inteligente, smart switch, 3 canais, 3 gang]
