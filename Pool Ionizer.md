@@ -9,6 +9,3 @@ status: in_stock
 ---
 
 # Pool Ionizer
-
-> [!note] Remark
-> SÓ A METADE SUPERIOR.
