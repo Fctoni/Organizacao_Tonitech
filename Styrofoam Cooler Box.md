@@ -1,7 +1,7 @@
 ---
 shelf: 42
 place: B01
-qty: 1
+qty: 2
 minimum_safe_stock: 0
 category: Household
 aliases: [caixa termica, isopor, cooler, termica]
