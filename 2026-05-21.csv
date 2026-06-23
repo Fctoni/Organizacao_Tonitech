@@ -1,0 +1,29 @@
+Item,Qty,Shelf,Place,Minimum_safe_stock,Notes
+Kit identificadores de cabos anilha,1,S02,B03,0
+Kit Pegboard (placas + hooks),1,S22,B04,0
+Solder Wick,8,S34,B01,2
+Sugador de solda,1,S34,B01,1
+Escova para limpeza de fluxo,2,S34,B01,1,Escova de dentes
+Suporte ferro de solda,2,S34,B01,0
+Estação de solda / retrabalho,1,S34,B01,0
+Suporte para cabos para soldar,1,S34,B01,0
+Tweezers (pinças para componentes),2,S34,B01,0
+Kit Chaves Allen,1,S21,W04,0
+Sargento da shoppee,2,S21,W04,0
+Esquadro vermelho de alumínio,1,S21,W03,0
+Placa FKS organizador,1,S01,B99,0,Edição 2022 - placa de agradecimento
+Cabos e fios diversos,1,S34,B02,0
+Rolo etiquetas adesivas para tirar pelos de roupas,6,S45,B01,2
+"Display 7"" Viewe UEDX8048007OE",1,S34,B03,0
+Display 20 caracteres 4 linhas 20 caracteres 2004A,1,S34,B03,0
+Conector trilho DIN x PCB,6,S34,B03,0
+Caixa patola pequena preta para PCB,3,S34,B03,0
+"Display 3,5"" TFT 480 x 320 sem processador",1,S34,B03,0
+"Bornes Mola 2,5mm Elyc",60,S34,B04,10
+Raspberry Pi 5 8GB,1,S34,B05,0
+Radxa Penta Sata Hat p/ Raspberry Pi,1,S34,B05,0
+"CYD 3,5"" Display com esp32 3,5""",1,S34,B05,0
+Suporte rolo de estanho,1,S34,B01,0
+Suporte roteador Unifi,2,S35,W02,0
+Cabo de rede original unifi,1,S35,W02,0
+Caixa Unifi Dream Router,1,S53,B01,0
