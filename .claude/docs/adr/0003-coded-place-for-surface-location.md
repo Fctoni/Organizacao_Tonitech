@@ -19,7 +19,7 @@ read *on demand* from the prefix — it is **not** stored as a field (this diffe
 - The canonical stored value is always the normalized, zero-padded form: position 3 is
   always `B03`, never `B3`. The script normalizes on write so equality and display are
   unambiguous.
-- The contract is the regex `^[BW][0-9]{2,}$`, held in the script (`PLACE_RE`). Writes
+- The contract is the regex `^[BW][0-9]{2,}$`, held in the script (`PLACE_RE`), plus a positive numeric position. Writes
   *compose* the code from a validated integer, so the script never **produces** an
   invalid place. Reads do not trust the stored value blindly: a note whose `place` is
   malformed (e.g. a hand-edit like `X01` or `caixa 9`) is surfaced — `find`/`list`/
@@ -40,25 +40,14 @@ read *on demand* from the prefix — it is **not** stored as a field (this diffe
 
 ## Consequences
 
-- **Glossary (CONTEXT.md) must be updated**, since this changes the ubiquitous
-  language: redefine **Location** as `(Shelf, place)`; add **Surface** and **Wall**;
-  reposition **Box** as one of two Surfaces; and remove `place`/`position` from
-  Location's `_Avoid_` list — "Place" is promoted to a canonical term with the narrow
-  meaning "the Surface-plus-position within a Shelf" (distinct from Location = Shelf +
-  Place). Without this, code and glossary contradict each other.
+- **Glossary (CONTEXT.md) owns the location vocabulary**, keeping the script and operator's language consistent.
 - **Reads (ADR-0001).** The TSV `box` column and the JSON `box` key are replaced by
   `place`, carrying the raw code (`B03`/`W03`). No separate `surface` column is added —
   the prefix is self-describing and keeps the read contract lean.
-- **The Inventory Dashboard must migrate too.** It references `box` in 7 Dataview
-  queries/filters. Dataview reads raw frontmatter and does **not** run the script, so it
-  cannot derive the Surface — dashboard queries filter on the `place` string itself
-  (e.g. `contains(place, "W")` for wall Items). A lone box filter becomes
-  `place = "B03"` rather than `box = 3`: less ergonomic, an accepted cost.
+- **The Inventory Dashboard reads raw frontmatter through Dataview**, not through the script. Location filters therefore use the `place` string (e.g. `place = "B03"`): less ergonomic than an integer box filter, an accepted cost.
 - **No clean lexicographic sort.** Because `place` is a string, Dataview's
   string sort puts all `B*` before all `W*`, and breaks once positions exceed 99
-  (`B100 < B99`). The script sorts numerically by parsing the digits; the dashboard's
-  string sort is a known, accepted limitation (a garage shelf is unlikely to exceed 99
-  positions on a Surface).
+  (`B100 < B99`). The script lists notes by filename, not by location. The dashboard's string sort is a known limitation.
 - **All mutation of `place` goes through the script (ADR-0002), including
   relocation.** `place` is written by `new` and by a `relocate` subcommand. Both take
   exactly one of `--box N` / `--wall N` (N ≥ 1); passing both, or neither, is an error.
@@ -71,4 +60,4 @@ read *on demand* from the prefix — it is **not** stored as a field (this diffe
 - **Migration is a one-time sanctioned script routine, not a hand-edit.** It reads each
   legacy `box: N` and rewrites it to `place: B<zero-padded N>` (so `box: 12` → `B12`,
   not `B012`), guarded by `test-inventory.sh`. After migration the script knows only
-  `place`; a note left with a bare `box:` fails with "no place" until migrated.
+  `place`; a note left with a bare `box:` remains visible with an empty place and a warning until migrated. Migration reports changed and skipped notes in JSON and is idempotent.

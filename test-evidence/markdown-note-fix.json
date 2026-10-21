@@ -1,0 +1,19 @@
+{
+  "production_url": "https://tonitech-inventario.vercel.app",
+  "project": "tonitech-inventario",
+  "scope": "felipes-projects-93cc7c39",
+  "decision": "Renderizar com react-markdown, HTML bruto desativado e filtro padrão de URLs. Remover do AST somente o primeiro bloco se for título igual ao nome do Item, normalizando espaços. Usar mdast-util-to-string para comparar o texto de títulos formatados. Não alterar o corpo armazenado.",
+  "reproduction": "Teste de renderização React falhou com o parágrafo original exibindo Markdown literal; passou após a correção.",
+  "checks": {
+    "npm_test": "11 testes passaram: listas, links, negrito, título inicial repetido, CRLF, espaços, Setext, corpo só título, títulos diferentes e posteriores, código, citação e XSS.",
+    "npm_run_build": "TypeScript e Vite passaram.",
+    "check_production": "HTTPS 200, cabeçalhos de segurança, assets idênticos ao build local, ausência de credenciais administrativas nos assets e endpoint sem autenticação recusado.",
+    "check_note_browser": "Frontend publicado validado com Playwright em 1366px e 390px: título único, Markdown, XSS, código e ausência de overflow horizontal. Todas as chamadas ao Supabase interceptadas com fixtures locais ao navegador. Sem erros de página.",
+    "database_integration": "Não executada: alteração exclusiva de apresentação; preservação do banco exigida."
+  },
+  "assets_sha256": {
+    "/assets/index-DG_4OS_e.js": "7c77967914636b3b79346ec3a3e3e64925382327cb404c8c9d3e79ed38970b15",
+    "/assets/index-DNZLhEj0.css": "4a4bc3201cc6bc4572721347220e6b50ce8a20a5a70faea0344861639bcca534"
+  },
+  "preservation": "Nenhuma escrita nas notas, vault ou banco; nenhum provisionamento ou alteração de senha. Mudanças anteriores preservadas. Deploy pelo script existente a partir de app, com valores de ambiente capturados e enviados sem impressão. Sem commit ou push."
+}

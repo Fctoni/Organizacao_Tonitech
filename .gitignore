@@ -5,3 +5,30 @@
 
 # SO
 .DS_Store
+
+# App, credenciais e artefatos locais
+node_modules/
+dist/
+.env*
+!.env.example
+.vercel/
+.supabase/
+supabase/.temp/
+supabase/.branches/
+coverage/
+test-results/
+playwright-report/
+*.pem
+*.key
+*.dump
+*.log
+__pycache__/
+*.pyc
+.cache/
+tmp/
+backups/
+snapshots/
+
+# Capturas intermediárias ficam locais; publicar apenas a rodada aprovada.
+test-evidence/1/*
+!test-evidence/1/2026-10-21T02-27-38-827Z/

@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { remoteClients } from './remote.mjs';
+import { exportVault } from './import.mjs';
+const { url, anonKey, admin } = remoteClients();
+const result = spawnSync('npm', ['run', 'build'], { env: { ...process.env, VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: anonKey }, encoding: 'utf8' });
+if (result.status) throw new Error('Build de comparação falhou; saída suprimida.');
+const origin = 'https://tonitech-inventario.vercel.app';
+const response = await fetch(origin, { redirect: 'manual' });
+assert.equal(response.status, 200);
+assert.equal(response.headers.get('x-frame-options'), 'DENY');
+assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+assert.ok(response.headers.get('content-security-policy').includes("frame-ancestors 'none'"));
+const html = await response.text();
+assert.ok(html.includes('Inventário ToniTech'));
+const files = [...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match => match[1]);
+assert.equal(files.length, 2);
+const originals = exportVault().items;
+for (const file of files) {
+  const bytes = Buffer.from(await (await fetch(origin + file)).arrayBuffer());
+  const local = readFileSync(`dist${file}`);
+  assert.ok(bytes.equals(local), 'Published asset matches reviewed local build');
+  const text = bytes.toString('utf8');
+  assert.ok(!text.includes(admin.supabaseKey));
+  for (const original of originals) assert.ok(!text.includes(original.original_base64));
+  console.log(JSON.stringify({ asset: file, sha256: createHash('sha256').update(bytes).digest('hex'), matches_local_build: true }));
+}
+const passwordEndpoint = await fetch(`${origin}/api/change-password`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+assert.equal(passwordEndpoint.status, 401);
+assert.equal(passwordEndpoint.headers.get('cache-control'), 'no-store');
+console.log('PASS public HTTPS without Vercel gate, security headers, matching assets, private backend credentials, unauthenticated endpoint denied');

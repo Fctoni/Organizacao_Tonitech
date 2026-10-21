@@ -17,10 +17,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export VAULT_DIR="${VAULT_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 python3 - "$@" <<'PY'
-import sys, os, json, glob, unicodedata, re
+import sys, os, json, glob, unicodedata, re, base64, hashlib
 
 VAULT = os.environ["VAULT_DIR"]
 DASHBOARD = "Inventory Dashboard.md"
+RESERVED = (DASHBOARD, "AGENTS.md")
 FIELDS_INT = ("shelf", "qty", "minimum_safe_stock")
 # A place is a coded spot: B<n> for a box, W<n> for a wall position, zero-padded to
 # >=2 digits. Writes compose it from a validated int (so the script never *produces*
@@ -38,6 +39,7 @@ READS (print TSV: header row + one row per item):
   find <query>        items whose name or aliases match <query> (case/accent-insensitive)
   list                every item
   low-stock           items where qty < minimum_safe_stock
+  export              lossless deterministic JSON: items + original CSV/Base/dashboard
 
 WRITES (print resulting item as JSON object; target EXACT note name):
   take --note NAME --n N         decrement qty by N (floors at 0 -> status out)
@@ -53,30 +55,56 @@ WRITES (print resulting item as JSON object; target EXACT note name):
                                  even if a value is unchanged (forces an explicit place)
   set-category --note NAME --category C    change an item's category
                                            (C must be in the controlled vocabulary)
-  migrate                        one-time: rewrite legacy `box: N` to a coded
-                                 `place` (zero-padded, e.g. box: 12 -> B12)
+  migrate                        rewrite legacy `box: N` to a coded `place`;
+                                 remove orphan box fields; idempotent. Prints JSON
+                                 with migrated, cleaned, skipped arrays, not an item.
 
 A `place` is a coded spot on a shelf: B<n> for a box, W<n> for a wall position,
 zero-padded to >=2 digits (B03, W12). Positions and shelves are >= 1 (no zero).
 Resolve a fuzzy phrase with `find` first, then call take/add on the exact name.
+All quantities (--qty, --n, --min) are integers >= 0; --min defaults to 0.
+Names are root note stems (without .md), not paths; dashboard and AGENTS are reserved.
+Unknown/repeated flags and extra arguments are errors. Aliases are comma-separated.
+Status is derived from qty on read and recomputed on every changed note.
+Malformed/missing places warn on reads and single-item writes, without hiding rows.
+Only the script's flat frontmatter schema is supported, not arbitrary YAML.
+VAULT_DIR overrides the vault directory; by default it is this script's repo root.
 """
 
 def die(msg, code=1):
     sys.stderr.write(json.dumps({"error": msg}) + "\n")
     sys.exit(code)
 
+def report_exception(kind, error, traceback):
+    if isinstance(error, (OSError, UnicodeError)):
+        die(str(error))
+    sys.__excepthook__(kind, error, traceback)
+
+sys.excepthook = report_exception
+
+def note_path(name):
+    if (not name.strip() or name.startswith(".") or name.endswith(".md")
+            or any(c in name for c in "/\\") or any(ord(c) < 32 for c in name)
+            or name + ".md" in RESERVED):
+        die("--note must be a visible root note name without .md, path separators or control characters; dashboard and AGENTS are reserved")
+    path = os.path.join(VAULT, name + ".md")
+    if os.path.islink(path):
+        die(f"item '{name}' is a symbolic link; refusing access")
+    return path
+
 def fold(s):
     return "".join(c for c in unicodedata.normalize("NFKD", str(s))
                     if not unicodedata.combining(c)).lower()
 
 def item_paths():
-    for p in sorted(glob.glob(os.path.join(VAULT, "*.md"))):
-        if os.path.basename(p) != DASHBOARD:
+    for p in sorted(glob.glob(os.path.join(glob.escape(VAULT), "*.md"))):
+        if os.path.basename(p) not in RESERVED:
+            note_path(os.path.basename(p)[:-3])
             yield p
 
 def split_frontmatter(text):
     """Return (fm_lines, start_idx, end_idx, all_lines) or (None, ...) if no frontmatter."""
-    lines = text.splitlines()
+    lines = text.splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":
         return None, None, None, lines
     for i in range(1, len(lines)):
@@ -86,6 +114,13 @@ def split_frontmatter(text):
 
 def parse_aliases(val):
     val = val.strip()
+    if val.startswith("["):
+        try:
+            aliases = json.loads(val)
+            if isinstance(aliases, list) and all(isinstance(a, str) for a in aliases):
+                return aliases
+        except ValueError:
+            pass
     if val.startswith("[") and val.endswith("]"):
         val = val[1:-1]
     return [a.strip().strip('"\'') for a in val.split(",") if a.strip()]
@@ -111,6 +146,8 @@ def parse(path):
             rec[key] = parse_aliases(val)
         elif key in ("category", "status", "place"):
             rec[key] = val or None
+    if rec["qty"] is not None and rec["qty"] >= 0:
+        rec["status"] = status_for(rec["qty"])
     return rec
 
 def record(rec):
@@ -118,9 +155,8 @@ def record(rec):
             ("note", "shelf", "place", "qty", "minimum_safe_stock", "category", "status")}
 
 def malformed_place(place):
-    """A place is malformed when present but not matching the contract. Composed
-    writes are always valid, so this only ever fires on hand-edited/corrupt notes."""
-    return place is not None and not PLACE_RE.match(place)
+    """Missing/invalid locations remain visible, including unmigrated legacy notes."""
+    return place is None or not PLACE_RE.fullmatch(place) or int(place[1:]) < 1
 
 def warn_malformed(recs):
     """Reads must not trust a stored place silently: emit a non-fatal warning to
@@ -161,7 +197,7 @@ def find_matches(query):
     return out
 
 def resolve_exact(name):
-    path = os.path.join(VAULT, name + ".md")
+    path = note_path(name)
     if not os.path.isfile(path):
         die(f"no item note named '{name}' (resolve with `find` first)")
     return path
@@ -169,58 +205,21 @@ def resolve_exact(name):
 def status_for(qty):
     return "in_stock" if qty > 0 else "out"
 
-def rewrite_qty(path, new_qty):
-    """Line-level rewrite of qty + status, preserving everything else."""
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    fm, start, end, lines = split_frontmatter(text)
-    if fm is None:
-        die(f"note '{os.path.basename(path)}' has no frontmatter")
-    new_status = status_for(new_qty)
-    saw_qty = saw_status = False
-    for i in range(start, end):
-        key = lines[i].split(":", 1)[0].strip()
-        if key == "qty":
-            lines[i] = f"qty: {new_qty}"; saw_qty = True
-        elif key == "status":
-            lines[i] = f"status: {new_status}"; saw_status = True
-    if not saw_qty:
-        die(f"note '{os.path.basename(path)}' has no qty field")
-    if not saw_status:
-        lines.insert(end, f"status: {new_status}")
-    text = "\n".join(lines)
-    if not text.endswith("\n"):
-        text += "\n"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
-
-def rewrite_category(path, new_category):
-    """Line-level rewrite of the category field, preserving everything else."""
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    fm, start, end, lines = split_frontmatter(text)
-    if fm is None:
-        die(f"note '{os.path.basename(path)}' has no frontmatter")
-    saw_category = False
-    for i in range(start, end):
-        key = lines[i].split(":", 1)[0].strip()
-        if key == "category":
-            lines[i] = f"category: {new_category}"; saw_category = True
-    if not saw_category:
-        lines.insert(end, f"category: {new_category}")
-    text = "\n".join(lines)
-    if not text.endswith("\n"):
-        text += "\n"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
-
 # ---------- argument helpers ----------
 def get_flags(args):
+    allowed = {
+        "take": {"note", "n"}, "add": {"note", "n"},
+        "new": {"note", "shelf", "box", "wall", "qty", "min", "category", "aliases"},
+        "relocate": {"note", "shelf", "box", "wall"},
+        "set-category": {"note", "category"},
+    }[cmd]
     flags, i = {}, 0
     while i < len(args):
         a = args[i]
         if not a.startswith("--"):
             die(f"unexpected argument '{a}'")
+        if a[2:] not in allowed or a[2:] in flags:
+            die(f"unknown or repeated flag '{a}'")
         if i + 1 >= len(args) or args[i + 1].startswith("--"):
             die(f"flag '{a}' expects a value")
         flags[a[2:]] = args[i + 1]
@@ -268,32 +267,45 @@ def place_from_flags(flags):
 
 def rewrite_fields(path, updates):
     """Update the given frontmatter fields in place, inserting any missing ones just
-    before the closing fence. `updates` maps field name -> stringified value."""
-    with open(path, encoding="utf-8") as f:
+    before the closing fence. Values are strings, or None to remove a field."""
+    qty = int(updates["qty"]) if "qty" in updates else valid_qty(path)
+    updates = {**updates, "status": status_for(qty)}
+    with open(path, encoding="utf-8", newline="") as f:
         text = f.read()
     fm, start, end, lines = split_frontmatter(text)
     if fm is None:
         die(f"note '{os.path.basename(path)}' has no frontmatter")
     seen = set()
+    newline = "\r\n" if lines[0].endswith("\r\n") else "\n"
     for i in range(start, end):
         key = lines[i].split(":", 1)[0].strip()
         if key in updates:
-            lines[i] = f"{key}: {updates[key]}"; seen.add(key)
-    for off, key in enumerate(k for k in updates if k not in seen):
-        lines.insert(end + off, f"{key}: {updates[key]}")
-    text = "\n".join(lines)
-    if not text.endswith("\n"):
-        text += "\n"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
+            lines[i] = f"{key}: {updates[key]}{newline}" if updates[key] is not None else ""
+            seen.add(key)
+    for off, key in enumerate(k for k in updates if k not in seen and updates[k] is not None):
+        lines.insert(end + off, f"{key}: {updates[key]}{newline}")
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("".join(lines))
+
+def valid_qty(path):
+    qty = parse(path)["qty"]
+    if qty is None or qty < 0:
+        die(f"note '{os.path.basename(path)}' needs an integer qty >= 0; refusing mutation")
+    return qty
 
 # ---------- dispatch ----------
 args = sys.argv[1:]
 if not args or args[0] in ("-h", "--help", "help"):
+    if len(args) > 1:
+        die("help does not accept arguments")
     sys.stdout.write(USAGE)
     sys.exit(0)
 
 cmd, rest = args[0], args[1:]
+if not os.path.isdir(VAULT):
+    die(f"vault directory does not exist: {VAULT}")
+if cmd in ("list", "low-stock", "migrate", "export") and rest:
+    die(f"{cmd} does not accept arguments")
 
 if cmd == "find":
     if not rest:
@@ -301,6 +313,36 @@ if cmd == "find":
     recs = [record(r) for r in find_matches(" ".join(rest))]
     warn_malformed(recs)
     print(tsv(recs))
+
+elif cmd == "export":
+    def original(path):
+        if os.path.islink(path):
+            die("refusing symbolic link in export")
+        with open(path, "rb") as source:
+            raw = source.read()
+        return {"filename": os.path.basename(path),
+                "original_base64": base64.b64encode(raw).decode("ascii"),
+                "sha256": hashlib.sha256(raw).hexdigest()}, raw.decode("utf-8")
+    items = []
+    for path in item_paths():
+        entry, text = original(path)
+        projection = parse(path)
+        projection.pop("path")
+        fm, _, end, lines = split_frontmatter(text)
+        body = "".join(lines[end + 1:]) if fm is not None else text
+        fields = dict(line.strip().split(":", 1) for line in (fm or []) if ":" in line)
+        fields = {key.strip(): value.strip() for key, value in fields.items()}
+        references = re.findall(r'!?\[\[([^\]]+)\]\]|!?\[[^\]]*\]\(([^)]+)\)', body)
+        entry.update(projection=projection, frontmatter=fields, body=body,
+                     references=sorted({a or b for a, b in references}))
+        items.append(entry)
+    sources = []
+    for path in sorted(glob.glob(os.path.join(glob.escape(VAULT), "*"))):
+        if os.path.basename(path) == DASHBOARD or path.endswith((".csv", ".base")):
+            sources.append(original(path)[0])
+    warn_malformed([entry["projection"] for entry in items])
+    print(json.dumps({"version": 1, "items": items, "sources": sources},
+                     ensure_ascii=False, sort_keys=True))
 
 elif cmd == "list":
     recs = [record(parse(p)) for p in item_paths()]
@@ -321,9 +363,9 @@ elif cmd in ("take", "add"):
     if n < 0:
         die("--n must be >= 0")
     path = resolve_exact(flags["note"])
-    cur = parse(path)["qty"] or 0
+    cur = valid_qty(path)
     new_qty = max(0, cur - n) if cmd == "take" else cur + n
-    rewrite_qty(path, new_qty)
+    rewrite_fields(path, {"qty": str(new_qty)})
     out = record(parse(path))
     if cmd == "take" and n > cur:
         out["warning"] = f"requested {n} but only {cur} on hand; floored at 0"
@@ -335,7 +377,7 @@ elif cmd == "new":
     if "note" not in flags:
         die("new requires --note NAME")
     name = flags["note"]
-    path = os.path.join(VAULT, name + ".md")
+    path = note_path(name)
     if os.path.exists(path):
         die(f"item '{name}' already exists")
     shelf = need_int_min(flags, "shelf", 1)
@@ -346,12 +388,14 @@ elif cmd == "new":
     minimum = need_int_min(flags, "min", 0) if "min" in flags else 0
     category = flags.get("category", "Uncategorized")
     validate_category(category)
-    aliases = parse_aliases(flags.get("aliases", ""))
-    al = "[" + ", ".join(aliases) + "]" if aliases else "[]"
+    aliases = [a.strip() for a in flags.get("aliases", "").split(",") if a.strip()]
+    if any(any(ord(c) < 32 for c in a) for a in aliases):
+        die("aliases must not contain control characters")
+    al = json.dumps(aliases, ensure_ascii=False)
     body = (f"---\nshelf: {shelf}\nplace: {place}\nqty: {qty}\n"
             f"minimum_safe_stock: {minimum}\ncategory: {category}\n"
             f"aliases: {al}\nstatus: {status_for(qty)}\n---\n\n# {name}\n")
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "x", encoding="utf-8") as f:
         f.write(body)
     print(json.dumps(record(parse(path)), ensure_ascii=False))
 
@@ -364,7 +408,7 @@ elif cmd == "set-category":
     category = flags["category"]
     validate_category(category)
     path = resolve_exact(flags["note"])
-    rewrite_category(path, category)
+    rewrite_fields(path, {"category": category})
     print(json.dumps(attach_place_warning(record(parse(path))), ensure_ascii=False))
 
 elif cmd == "relocate":
@@ -395,15 +439,14 @@ elif cmd == "migrate":
         if fm is None:
             skipped.append({"note": base, "reason": "no frontmatter"}); continue
         keys = [lines[i].split(":", 1)[0].strip() for i in range(start, end)]
+        if "box" in keys:
+            qty = parse(p)["qty"]
+            if qty is None or qty < 0:
+                skipped.append({"note": base, "reason": "qty must be an integer >= 0"}); continue
         if "place" in keys:
             if "box" in keys:
                 # already on the place schema but carries an orphan legacy box: drop it
-                del lines[start + keys.index("box")]
-                out = "\n".join(lines)
-                if not out.endswith("\n"):
-                    out += "\n"
-                with open(p, "w", encoding="utf-8") as f:
-                    f.write(out)
+                rewrite_fields(p, {"box": None})
                 cleaned.append({"note": base, "reason": "removed orphan box field"})
             else:
                 skipped.append({"note": base, "reason": "already has place"})
@@ -419,12 +462,7 @@ elif cmd == "migrate":
         if n < 1:
             skipped.append({"note": base, "reason": f"box < 1: {n}"}); continue
         code = f"B{n:02d}"
-        lines[i] = f"place: {code}"
-        out = "\n".join(lines)
-        if not out.endswith("\n"):
-            out += "\n"
-        with open(p, "w", encoding="utf-8") as f:
-            f.write(out)
+        rewrite_fields(p, {"box": None, "place": code})
         migrated.append({"note": base, "place": code})
     print(json.dumps({"migrated": migrated, "cleaned": cleaned, "skipped": skipped},
                      ensure_ascii=False))

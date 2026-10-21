@@ -1,5 +1,7 @@
 # Decisões
 
+Registro histórico preservado; as decisões vigentes ficam em `.claude/docs/adr/` na raiz do repositório.
+
 | Data | Contexto | Decisão | Motivo | Alternativas descartadas | Substitui |
 |------|----------|---------|--------|--------------------------|-----------|
 | 2026-05-24 | Organização das regras do projeto | `CLAUDE.md` enxuto que só aponta; substância vive nas skills | `CLAUDE.md` carrega em toda sessão (custa contexto); skills carregam sob demanda; força o uso da skill e elimina duplicação | `CLAUDE.md` como SSOT com o workflow completo (a skill nunca disparava) | — |

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import { localClients } from './local.mjs';
+import { exportVault } from './import.mjs';
+const { admin } = localClients();
+const assets = await readdir('dist/assets');
+const code = (await Promise.all(assets.map(name => readFile(`dist/assets/${name}`, 'utf8')))).join('\n');
+assert.ok(!code.includes(admin.supabaseKey), 'Administrative credential must not enter client bundle');
+assert.ok(!code.includes('SERVER_ONLY'));
+for (const item of exportVault().items) assert.ok(!code.includes(item.original_base64), 'Original note must not enter client bundle');
+assert.ok(!assets.some(name => name.endsWith('.map')));
+console.log('PASS client bundle excludes administrative key, original bytes and source maps');

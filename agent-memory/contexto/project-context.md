@@ -1,4 +1,6 @@
-# Contexto do Projeto
+# Contexto legado do projeto
+
+Registro histórico preservado; consulte `app/README.md` e `.claude/docs/adr/0004-web-inventory.md` na raiz do repositório para o estado operacional atual.
 
 ## Stack
 - Vault Obsidian — notas markdown com frontmatter YAML.

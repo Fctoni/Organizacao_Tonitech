@@ -5,7 +5,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INV="$SCRIPT_DIR/inventory.sh"
 
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d)" || exit 1
 trap 'rm -rf "$TMP"' EXIT
 export VAULT_DIR="$TMP"
 

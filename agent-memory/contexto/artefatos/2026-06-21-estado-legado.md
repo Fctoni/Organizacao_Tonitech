@@ -1,4 +1,13 @@
-# Estado Atual do Projeto
+---
+titulo: Estado legado antes do inventário web
+data início: 2026-06-21
+data fim: 2026-10-21
+status: arquivado
+tags: [inventario, memoria, legado]
+resumo: Briefing anterior preservado como registro histórico durante a migração da memória canônica.
+---
+
+# Estado legado do projeto
 
 ## Fase atual
 Inventário em população — 54 itens cadastrados. Taxonomia de categorias consolidada em 8 valores canônicos. Bancada de solda nova sendo montada na prateleira 34.
