@@ -5,7 +5,7 @@ Inventário web publicado; fonte operacional e procedimento de manutenção em `
 
 ## Última atividade
 - **Data**: 2026-10-21
-- **O que foi feito**: Consolidada a entrega e migrada a memória anterior sem perder seu histórico; ver `artefatos/2026-10-21-entrega-inventario-web.md`.
+- **O que foi feito**: Corrigida e validada a paginação da CLI com sessão autorizada; ver `artefatos/2026-10-21-debug-paginacao-cli.md`.
 
 ## Próximos passos
-- [ ] Usuário realizar o primeiro acesso e escolher sua senha pessoal pelo fluxo obrigatório do app.
+- Nenhum próximo passo imediato nesta sessão.
