@@ -31,11 +31,11 @@ Executados em `app`, com `INVENTORY_PROJECT_REF` confirmado:
 | `node scripts/verify-remote.mjs` | Quatro migrations locais/remotas iguais; hashes, projeções, corpo e extras conferidos; nenhuma fixture/conta efêmera restante |
 | `node scripts/deploy.mjs` | Variáveis enviadas via stdin; segredo administrativo restrito ao servidor; deploy Ready |
 | `node scripts/check-production.mjs` | HTTPS 200 sem gate Vercel, headers, endpoint anônimo 401, assets iguais e sem service key/originais |
-| `node scripts/browser-check.mjs` | Fluxos aprovados em Chromium 156.0.8078.4; desktop 1366×900 e mobile 390×844; fixture/usuário removidos |
+| Prova pontual de navegador (script removido após a entrega) | Fluxos aprovados em Chromium 156.0.8078.4; desktop 1366×900 e mobile 390×844; fixture/usuário removidos |
 
 O roteiro de navegador cobriu login, bloqueio inicial, confirmação de senha divergente, troca pelo endpoint publicado, novo login, cadastro, busca por alias sem caixa/acento, filtros combinados, Take excedente, Add, Relocate, Recategorize, histórico com categorias antes/depois, Tab/Shift+Tab, Escape, retorno de foco, rolagem mobile e logout persistido. A execução aprovada não registrou pageerror nem requestfailed. Não houve impressão/PDF, trace ou vídeo. Capturas foram lidas pelo agente; não há cortes ou sobreposições evidentes nos controles observados. A avaliação é heurística, sem auditoria formal de contraste/leitor de tela ou hardware real.
 
-As oito imagens aprovadas estão em `test-evidence/1/2026-10-21T02-27-38-827Z/` e integram a entrega autorizada. Tentativas intermediárias permanecem locais e ignoradas; dumps e transcrições não integram as evidências.
+As oito imagens aprovadas estão em `test-evidence/1/2026-10-21T02-27-38-827Z/` e integram a entrega autorizada. Capturas intermediárias não versionadas foram removidas na limpeza autorizada; dumps e transcrições não integram as evidências.
 
 ## Reconciliação final e hashes
 

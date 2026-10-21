@@ -5,7 +5,7 @@ Inventário web publicado; fonte operacional e procedimento de manutenção em `
 
 ## Última atividade
 - **Data**: 2026-10-21
-- **O que foi feito**: Corrigida e validada a paginação da CLI com sessão autorizada; ver `artefatos/2026-10-21-debug-paginacao-cli.md`.
+- **O que foi feito**: Consolidada a entrega do chat, comportamento versionado, consumo e limpeza autorizada; ver `artefatos/2026-10-21-entrega-chat-assistente.md`.
 
 ## Próximos passos
 - Nenhum próximo passo imediato nesta sessão.

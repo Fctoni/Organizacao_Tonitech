@@ -12,6 +12,8 @@ A importação insere apenas originais inéditos. Uma origem já conhecida com h
 
 ## Limites
 
+Clientes operacionais usam Auth de usuário autorizado e as mesmas RPCs do app, sem credencial administrativa. Sessões da CLI são privadas por máquina e ficam fora do repositório; apenas código e procedimentos acompanham o checkout. As mutações são atômicas, mas não idempotentes: clientes não repetem escritas automaticamente e tratam resposta perdida como resultado incerto, reconciliado pelo histórico. Isso evita duplicar movimentações sem ampliar o contrato do banco com chaves de idempotência.
+
 O projeto dedicado usa a organização TecnoHard (`msxuixhofofwiecxcvkr`), assinatura Pro existente, região `sa-east-1` e compute Micro. O usuário autorizou o incremento estimado de US$ 10/mês para evitar a quota global gratuita. Não há alteração de planos, billing ou projetos alheios. A Vercel usa o escopo `felipes-projects-93cc7c39`, com upload apenas de `app`.
 
 Não há multi-local nem soma de quantidades de Itens diferentes. A unidade continua descrita pela nota original; metros não são convertidos em peças. A senha temporária é entregue exclusivamente no chat final, usando o retorno de ferramenta como transporte expressamente autorizado; nunca é persistida no repositório, auditoria, GitHub, screenshots ou ambiente.

@@ -50,3 +50,19 @@ legend { font-weight: 700; }
 .history { padding-left: 1.3rem; font-size: .9rem; }
 .history li { margin-bottom: .7rem; }
 @media (max-width: 480px) { dialog { padding: 1rem; } header { align-items: flex-start; } .items { grid-template-columns: 1fr; } }
+/* Chat uses the same form controls as inventory; long Markdown cannot widen the page. */
+.inventory-chat { margin-block: 1rem; padding: 1rem; border: 1px solid #64748b; border-radius: .75rem; }
+.inventory-chat summary { cursor: pointer; font-weight: 700; }
+.chat-messages { max-height: 65vh; overflow-y: auto; overflow-wrap: anywhere; }
+.chat-message { padding: .75rem; margin-block: .75rem; border-left: 3px solid #64748b; min-width: 0; }
+.chat-message.user { border-color: #2563eb; }
+.chat-message h3, .chat-card h4 { margin-top: 0; }
+.chat-card { border: 1px solid #64748b; border-radius: .5rem; padding: .75rem; margin-block: .75rem; min-width: 0; }
+.chat-card small { display: block; overflow-wrap: anywhere; }
+.chat-card button { margin-top: .5rem; }
+.chat-message pre { overflow-x: auto; max-width: 100%; white-space: pre-wrap; }
+.inventory-chat textarea { min-height: 5rem; width: 100%; }
+.prompt-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant-settings { margin-block: 1rem; }
+.assistant-settings textarea { width: 100%; box-sizing: border-box; }
+.assistant-settings li { overflow-wrap: anywhere; }

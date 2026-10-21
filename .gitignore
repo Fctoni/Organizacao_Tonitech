@@ -28,6 +28,10 @@ __pycache__/
 tmp/
 backups/
 snapshots/
+tonitech-inventory/
+session.json
+session.new
+session.lock
 
 # Capturas intermediárias ficam locais; publicar apenas a rodada aprovada.
 test-evidence/1/*

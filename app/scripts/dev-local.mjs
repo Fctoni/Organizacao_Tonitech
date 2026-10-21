@@ -1,12 +1,16 @@
 import { createServer } from 'vite';
 import { localClients } from './local.mjs';
 import { changePassword } from '../server/change-password.mjs';
+import chatHandler from '../api/chat.mjs';
 const { url, anonKey, admin, client } = localClients();
 process.env.VITE_SUPABASE_URL = url;
 process.env.VITE_SUPABASE_ANON_KEY = anonKey;
+process.env.SUPABASE_URL = url;
+process.env.SUPABASE_ANON_KEY = anonKey;
 const server = await createServer({ server: { host: '127.0.0.1', port: 5173, strictPort: true }, plugins: [{
   name: 'inventory-password-endpoint',
   configureServer(server) {
+    server.middlewares.use('/api/chat', (req, res) => void chatHandler(req, res));
     server.middlewares.use('/api/change-password', async (req, res) => {
   try {
     let body = '';

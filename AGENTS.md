@@ -1,8 +1,8 @@
 # Instruções do projeto
 
-Para operações do inventário após o cutover, siga `app/README.md` e `.claude/docs/adr/0004-web-inventory.md`.
+Para consultas e movimentações do inventário atual, use a skill `web-inventory` em `.claude/skills/web-inventory/SKILL.md`. Se ela não aparecer no catálogo da sessão, leia esse arquivo diretamente.
 
-Para operações nas notas do inventário, use a skill `garage-inventory` e a interface `inventory.sh`.
+Para preservar, auditar ou exportar notas originais do inventário, use a skill `garage-inventory`.
 
 ## Agent skills
 

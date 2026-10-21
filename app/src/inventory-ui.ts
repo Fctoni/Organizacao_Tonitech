@@ -1,7 +1,8 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Item } from './inventory';
 
-export type Movement = { id: number; action: string; requested: number | null; created_at: string; before_value: Item | null; after_value: Item };
+type MovementValue = Pick<Item, 'qty' | 'shelf' | 'place' | 'category'>;
+export type Movement = { id: number; action: string; requested: number | null; created_at: string; before_value: MovementValue | null; after_value: MovementValue };
 const actionNames: Record<string, string> = { take: 'Retirada', add: 'Entrada', create: 'Cadastro', relocate: 'Mudança de localização', recategorize: 'Categoria alterada', import: 'Importação' };
 
 export function movementDescription(movement: Movement): string {
