@@ -4,8 +4,8 @@
 Inventário web publicado; fonte operacional e procedimento de manutenção em `app/README.md` na raiz do repositório.
 
 ## Última atividade
-- **Data**: 2026-10-21
-- **O que foi feito**: Consolidada a entrega do chat, comportamento versionado, consumo e limpeza autorizada; ver `artefatos/2026-10-21-entrega-chat-assistente.md`.
+- **Data**: 2026-10-22
+- **O que foi feito**: Consolidado o MCP com aceite humano básico e fechamento das avaliações antigas; ver `artefatos/2026-10-22-fechamento-mcp.md`.
 
 ## Próximos passos
 - Nenhum próximo passo imediato nesta sessão.

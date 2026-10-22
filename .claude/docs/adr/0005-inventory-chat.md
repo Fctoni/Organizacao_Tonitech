@@ -4,7 +4,7 @@
 
 O app React/Vite usa AI SDK 7 com adaptador Google direto e um endpoint Node autenticado na Vercel. `GEMINI_MODEL` é obrigatória, sem modelo padrão. Chave Google e segredo de assinatura ficam exclusivamente no servidor. A ausência de configuração bloqueia somente o chat.
 
-O endpoint valida o JWT com Supabase Auth e exige `access_state = ready` antes de criar o modelo. As ferramentas usam chave pública e JWT do usuário, com as mesmas RPCs e regras de acesso do app. Não há Gateway, MCP, subprocessos, SQL livre ou ferramenta administrativa.
+O endpoint valida o JWT com Supabase Auth e exige `access_state = ready` antes de criar o modelo. As ferramentas usam chave pública e JWT do usuário, com as mesmas RPCs e regras de acesso do app. O chat não invoca Gateway, MCP, subprocessos, SQL livre ou ferramenta administrativa. O endpoint MCP independente reutiliza essas ferramentas conforme o ADR-0007.
 
 A função Vercel inclui explicitamente `src/inventory.ts`, pois o runtime importa a lógica compartilhada de busca por esse caminho. Logs de falha registram somente categoria de erro permitida, status HTTP e indicação de retry quando disponíveis; nunca corpo, mensagem do provedor ou credenciais.
 

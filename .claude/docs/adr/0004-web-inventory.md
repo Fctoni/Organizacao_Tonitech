@@ -10,6 +10,10 @@ O acesso requer associação explícita ao usuário autorizado e troca de senha 
 
 A importação insere apenas originais inéditos. Uma origem já conhecida com hash diferente gera erro; nunca sobrescreve alterações operacionais. Snapshots ficam restritos no banco. Após revisão, publicação e provisionamento autorizados, o banco remoto do app é a fonte operacional. O vault permanece intacto como origem preservada, sem movimentações paralelas. Apenas a pasta `app` é enviada ao provedor de deploy.
 
+## Modelo de localização
+
+Mantemos Location única: os casos avaliados não comprovam quantidade de um mesmo Item dividida entre locais; agrupamento de Itens distintos e possível duplicidade de cadastro não justificam ampliar o modelo. Reabrir a avaliação quando houver um caso físico identificado, com Item, quantidade/unidade em cada parcela e Locations completas (Shelf e Place). Essa evidência deverá orientar a semântica de Take/Add, transferência parcial, total, Low Stock e histórico antes de implementar multi-local.
+
 ## Limites
 
 Clientes operacionais usam Auth de usuário autorizado e as mesmas RPCs do app, sem credencial administrativa. Sessões da CLI são privadas por máquina e ficam fora do repositório; apenas código e procedimentos acompanham o checkout. As mutações são atômicas, mas não idempotentes: clientes não repetem escritas automaticamente e tratam resposta perdida como resultado incerto, reconciliado pelo histórico. Isso evita duplicar movimentações sem ampliar o contrato do banco com chaves de idempotência.

@@ -13,7 +13,7 @@ npm run import
 npm run dev:local
 ```
 
-O servidor local usa `127.0.0.1:5173` e inclui os endpoints de troca de senha e chat. Os scripts capturam as credenciais locais da CLI em memória; não imprimem nem gravam senhas. Nenhum usuário real é criado automaticamente. `npm run dev` é o Vite básico e requer configuração pública de ambiente; para endpoints locais, use `dev:local`.
+O servidor local usa `127.0.0.1:5173` e inclui os endpoints de troca de senha, chat e MCP. Os scripts capturam as credenciais locais da CLI em memória; não imprimem nem gravam senhas. Nenhum usuário real é criado automaticamente. `npm run dev` é o Vite básico e requer configuração pública de ambiente; para endpoints locais, use `dev:local`.
 
 ```bash
 npm test
@@ -85,6 +85,10 @@ npm run test:chat:integration
 
 A integração de chat usa exclusivamente `localClients`, sem aceitar destino remoto. Cria e remove usuários/Itens sintéticos. Verifica Auth/JWT/RPC reais, confirmação concorrente, replay idempotente, assinatura, isolamento e erros definitivos, incluindo o cliente real do endpoint com JWTs de dois usuários, sem compartilhar sessão entre requisições. O teste unitário do adaptador Google substitui apenas o transporte HTTP e confere o modelo explícito, as ferramentas e a conversão da stream. Não há chamada ao Google nem teste de deploy Vercel nesses checks.
 
+## MCP para Claude
+
+O MCP publicado reutiliza as consultas, propostas e RPC transacional do chat, com cliente OAuth público pré-registrado, DCR desabilitado e ponte PostgreSQL sem passagem de Bearer à Data API. `executeChange(ticket)` permite consultar e alterar estoque sem confirmação no app; o consentimento é conversacional no Claude e não é atestado pelo backend. O chat embutido conserva seu cartão de confirmação. URL, Client ID público, configuração, testes permanentes e playbook humano estão em [MCP.md](MCP.md). A migration de autenticação está aplicada no projeto remoto dedicado e validada em bancos locais descartáveis; a execução direta não exigiu nova migration ou mudança de credenciais. Evidências das cinco operações diretas, replay hospedado e aceite humano básico com conta real do Claude estão em [validação MCP](../docs/validation/mcp.md). O TOML usa Site URL local; aplique a migration local antes de reiniciar Auth para ativar o hook.
+
 ## Importação e recuperação
 
 `npm run import` lê exclusivamente `inventory.sh export`. A importação compara hashes, insere origens novas e rejeita uma origem conhecida com conteúdo diferente. Reexecutar não sobrescreve alterações do app. As fontes CSV/Base/dashboard são arquivadas sem gerar Itens duplicados.
@@ -99,8 +103,8 @@ Produção: https://tonitech-inventario.vercel.app. Projeto Supabase dedicado `p
 
 `scripts/create-project.mjs` recusa executar se já existe o projeto dedicado. Não deve ser reexecutado para atualizar produção. Para manutenção, execute dentro de `app`:
 
-1. Confirmar `INVENTORY_PROJECT_REF=pfhfhrypxncgzmnmlztm` e executar `node scripts/apply-remote.mjs` para migrations/configuração previamente validadas. O script confere identidade e vínculo antes de escrever, capturando saída administrativa.
-2. `auth.site_url` aponta à produção. `auth.enable_signup=false` bloqueia cadastro público. `auth.email.enable_signup=true` mantém o provedor de login por e-mail habilitado; o bloqueio global foi comprovado remotamente.
+1. Confirmar `INVENTORY_PROJECT_REF=pfhfhrypxncgzmnmlztm` e executar `node scripts/apply-remote.mjs` para migrations previamente validadas. O script confere identidade e vínculo antes de escrever, capturando saída administrativa. Não executa `config push`; o patch OAuth/hook é específico e segue [MCP.md](MCP.md), preservando outros campos Auth.
+2. A Site URL remota aponta à produção; o TOML aponta ao desenvolvimento local. Cadastro público permanece bloqueado no remoto, com login por e-mail habilitado. Não aplicar o TOML local sobre a configuração Auth de produção.
 3. Usar `node scripts/import-remote.mjs` para importação e `node scripts/verify-remote.mjs` para conferência pré-cutover. A comparação de projeções com o vault é intencionalmente pré-cutover; após alterações operacionais legítimas no app, somente os originais devem coincidir.
 4. Definir `VERCEL_CLI_PATH` para a instalação autenticada e executar `node scripts/deploy.mjs`. O script envia variáveis por stdin, mantém a service role como Secret do servidor e publica somente `app` no projeto `tonitech-inventario`, escopo `felipes-projects-93cc7c39`. Não enviar a raiz do vault.
 5. Executar `node scripts/check-production.mjs`: verifica HTTPS público, cabeçalhos, endpoint e igualdade dos assets publicados com o build local. O helper não imprime credenciais.

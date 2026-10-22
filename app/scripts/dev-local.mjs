@@ -2,6 +2,7 @@ import { createServer } from 'vite';
 import { localClients } from './local.mjs';
 import { changePassword } from '../server/change-password.mjs';
 import chatHandler from '../api/chat.mjs';
+import mcpHandler from '../api/mcp.mjs';
 const { url, anonKey, admin, client } = localClients();
 process.env.VITE_SUPABASE_URL = url;
 process.env.VITE_SUPABASE_ANON_KEY = anonKey;
@@ -10,6 +11,10 @@ process.env.SUPABASE_ANON_KEY = anonKey;
 const server = await createServer({ server: { host: '127.0.0.1', port: 5173, strictPort: true }, plugins: [{
   name: 'inventory-password-endpoint',
   configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (['/api/mcp', '/.well-known/oauth-protected-resource/api/mcp'].includes(req.url?.split('?')[0])) void mcpHandler(req, res);
+      else next();
+    });
     server.middlewares.use('/api/chat', (req, res) => void chatHandler(req, res));
     server.middlewares.use('/api/change-password', async (req, res) => {
   try {

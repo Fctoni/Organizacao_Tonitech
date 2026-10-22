@@ -29,7 +29,7 @@ enabled = false
 
 [auth]
 enabled = true
-site_url = "https://tonitech-inventario.vercel.app"
+site_url = "http://127.0.0.1:5173"
 additional_redirect_urls = []
 enable_signup = false
 enable_anonymous_sign_ins = false
@@ -38,6 +38,15 @@ minimum_password_length = 12
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = false
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/inventory_auth/custom_access_token"
 
 [analytics]
 enabled = false

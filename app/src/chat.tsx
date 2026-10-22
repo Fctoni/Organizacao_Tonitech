@@ -9,7 +9,7 @@ import { AssistantSettings } from './assistant-settings';
 import { conversationUsage, readUsage, recordUsage, type RunUsage, type UsageLedger } from './chat-usage';
 
 type Operation = { action: 'create' | 'take' | 'add' | 'relocate' | 'recategorize'; item_id?: string; input: Partial<Item> & { n?: number } };
-type Proposal = { id: string; expiresAt: number; requestText: string; operation: Operation; item: Item | null };
+export type Proposal = { id: string; expiresAt: number; requestText: string; operation: Operation; item: Item | null };
 type ToolOutput = { item?: Item; items?: Item[]; total?: number; nextOffset?: number | null; categories?: string[];
   movements?: Movement[]; nextBefore?: number | null; proposal?: Proposal; ticket?: string };
 type Props = { db: SupabaseClient; onChanged: () => Promise<void>; onOpen: (id: string) => void };
@@ -36,7 +36,7 @@ function ItemCard({ item, onOpen }: { item: Item; onOpen: Props['onOpen'] }) {
     <details><summary>Detalhes técnicos</summary><small>UUID: {item.id}</small></details><button type="button" onClick={() => onOpen(item.id)}>Abrir Item</button></div>;
 }
 
-function Confirmation({ proposal, ticket, db, onChanged, onOpen }: Props & { proposal: Proposal; ticket: string }) {
+export function Confirmation({ proposal, ticket, db, onChanged, onOpen }: Props & { proposal: Proposal; ticket: string }) {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'cancelled' | 'rejected'>('idle');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<Item | null>(null);

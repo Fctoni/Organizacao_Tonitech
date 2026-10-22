@@ -8,20 +8,9 @@ import { conversationMetadata, resumeConversation } from './chat-context.mjs';
 import { activePrompt, assistantSettings } from './assistant-settings.mjs';
 import { usageMetadata } from './chat-usage.mjs';
 import { tokenCount } from '../src/chat-usage.ts';
+import { operationErrors } from './inventory-operation.mjs';
 
 const reply = (status, message, retryable) => Response.json({ message, ...(retryable !== undefined ? { retryable } : {}) }, { status, headers: { 'Cache-Control': 'no-store' } });
-const operationErrors = {
-  PT409: [409, 'O Item mudou desde a proposta. Consulte novamente e peça outro cartão.'],
-  PT410: [410, 'Proposta expirada sem gravação. Solicite uma nova proposta.'],
-  '23505': [409, 'Já existe um Item com esse nome. Consulte o Item existente ou solicite outra proposta com um nome diferente.'],
-  '22003': [422, 'A quantidade final excede o limite permitido. Consulte o saldo e solicite outra proposta com uma quantidade menor.'],
-  '23503': [422, 'A categoria ou o Item não está mais disponível. Consulte novamente e solicite outra proposta.'],
-  '23502': [422, 'Faltam dados obrigatórios. Corrija o pedido e solicite outra proposta.'],
-  '23514': [422, 'Os dados violam as regras do inventário. Corrija o pedido e solicite outra proposta.'],
-  '22023': [422, 'A operação ou o Item não é válido. Consulte novamente e solicite outra proposta.'],
-  '22P02': [422, 'Os dados da operação não são válidos. Corrija o pedido e solicite outra proposta.'],
-  '42501': [403, 'Acesso ao inventário não liberado. Entre novamente antes de solicitar outra proposta.'],
-};
 const inputSchema = z.strictObject({
   messages: z.array(z.strictObject({ role: z.literal('user'), parts: z.array(z.strictObject({ type: z.literal('text'), text: z.string().trim().min(1).max(2000) })).length(1) })).min(1).max(12),
   context: z.string().max(86000).optional(),
@@ -71,10 +60,11 @@ export async function chat(request, dependencies = {}) {
     if (['settings', 'save-settings', 'restore-settings'].includes(body?.action)) return await assistantSettings(db, body);
     const secret = env.CHAT_SIGNING_SECRET;
     if (!secret || secret.length < 32) return reply(503, 'Chat não configurado: defina GEMINI_MODEL, GOOGLE_GENERATIVE_AI_API_KEY e CHAT_SIGNING_SECRET (mínimo 32 caracteres) no servidor.');
-    if (body?.action === 'confirm') {
-      if (!z.strictObject({ action: z.literal('confirm'), ticket: z.string().max(24000) }).safeParse(body).success) return reply(400, 'Confirmação inválida.', false);
+    if (body?.action === 'confirm' || body?.action === 'review') {
+      if (!z.strictObject({ action: z.enum(['confirm', 'review']), ticket: z.string().max(24000) }).safeParse(body).success) return reply(400, 'Confirmação inválida.', false);
       let proposal;
       try { proposal = verifyProposal(body.ticket, data.user.id, secret); } catch { return reply(403, 'Proposta inválida ou expirada. Solicite uma nova proposta.', false); }
+      if (body.action === 'review') return Response.json({ proposal }, { headers: { 'Cache-Control': 'no-store' } });
       const result = await db.rpc('execute_inventory_operation', { operation_id: proposal.id, payload: proposal.operation, expires_at: new Date(proposal.expiresAt).toISOString() });
       if (result.error) {
         const code = result.error.code;

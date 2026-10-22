@@ -6,6 +6,10 @@ import { observeInventoryAccess, saveInventoryChange, movementDescription, type 
 import './style.css';
 import { ItemNote } from './item-note';
 import { InventoryChat } from './chat';
+import { captureMcpIntent } from './mcp-intent';
+import { McpRequest } from './mcp-request';
+
+const initialMcpIntent = captureMcpIntent(window.location, window.history);
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -16,6 +20,7 @@ function Field({ label, name, type = 'text', value, required = true, min = 0 }: 
 }
 
 function App() {
+  const [mcpIntent, setMcpIntent] = useState(initialMcpIntent);
   const [session, setSession] = useState<Session | null>(null);
   const [access, setAccess] = useState('loading');
   const [items, setItems] = useState<Item[]>([]);
@@ -117,6 +122,7 @@ function App() {
       })}><Field label="Senha atual" name="currentPassword" type="password" /><Field label="Nova senha" name="newPassword" type="password" /><Field label="Confirme a nova senha" name="confirmation" type="password" /><button disabled={busy}>Alterar senha</button></form></section>}
       {(access === 'denied' || access === 'error') && <p>Este acesso não está liberado para o inventário. Contate o administrador ou saia para tentar novamente.</p>}
       {access === 'ready' && <>
+        {mcpIntent && <McpRequest key={session?.user.id} intent={mcpIntent} db={db} onChanged={load} onOpen={id => setSelected(items.find(item => item.id === id) ?? null)} onClose={() => setMcpIntent(null)} />}
         <InventoryChat key={session?.user.id} db={db} onChanged={load} onOpen={id => { const item = items.find(item => item.id === id); if (item) setSelected(item); else setNotice('Atualize a lista para abrir este Item.'); }} />
         <section className="toolbar"><div><h2>Seus Itens</h2><p>{items.length} Itens · {items.filter(item => item.low_stock).length} abaixo do estoque mínimo</p></div><div className="buttons"><button disabled={busy || loading} onClick={() => void run(load)}>Atualizar</button><button disabled={busy || loading} onClick={() => { setCreating(true); setError(''); setNotice(''); }}>Cadastrar Item</button></div></section>
         <section className="filters" aria-label="Filtros"><label className="search">Buscar por nome ou alias<input type="search" value={filters.query ?? ''} onChange={event => setFilters({ ...filters, query: event.target.value })} /></label>

@@ -1,6 +1,6 @@
 # Inventário
 
-Schema do inventário aplicado no Supabase local dedicado `tonitech-inventory` e no projeto remoto dedicado `pfhfhrypxncgzmnmlztm`, organização TecnoHard Pro, região `sa-east-1`. As sete migrations estão aplicadas nos dois ambientes; as duas últimas pertencem ao domínio descrito em `assistant.md`. O banco remoto é a fonte operacional; o vault permanece preservado. O estado de acesso de cada usuário é consultado por `access_state`, sem manter uma cópia operacional neste documento.
+Schema do inventário aplicado no Supabase local dedicado `tonitech-inventory` e no projeto remoto dedicado `pfhfhrypxncgzmnmlztm`, organização TecnoHard Pro, região `sa-east-1`. Migrations de inventário e assistente estão aplicadas nos dois ambientes; a autenticação MCP tem estado próprio em `mcp-auth.md`. O banco remoto é a fonte operacional; o vault permanece preservado. O estado de acesso de cada usuário é consultado por `access_state`, sem manter uma cópia operacional neste documento.
 
 A migration `20261021000100_chat_operations.sql` está aplicada localmente e no projeto remoto dedicado. O smoke remoto comprovou confirmação e replay concorrente com Item sintético, sem duplicar o movimento. Resumo auditável em `docs/validation/chat-assistente.md`.
 
