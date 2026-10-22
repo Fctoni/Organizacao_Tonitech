@@ -1,13 +1,15 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import type { Item } from './inventory';
+import { unitSuffix } from './item-unit.ts';
 
-type MovementValue = Pick<Item, 'qty' | 'shelf' | 'place' | 'category'>;
+type MovementValue = Pick<Item, 'qty' | 'shelf' | 'place' | 'category'> & Partial<Pick<Item, 'body'>>;
 export type Movement = { id: number; action: string; requested: number | null; created_at: string; before_value: MovementValue | null; after_value: MovementValue };
 const actionNames: Record<string, string> = { take: 'Retirada', add: 'Entrada', create: 'Cadastro', relocate: 'Mudança de localização', recategorize: 'Categoria alterada', import: 'Importação' };
 
 export function movementDescription(movement: Movement): string {
   const category = movement.action === 'recategorize' ? ` · ${movement.before_value?.category ?? 'Não registrada'} → ${movement.after_value.category}` : '';
-  return `${actionNames[movement.action] ?? movement.action}${movement.requested !== null ? ` (${movement.requested})` : ''} · Quantidade: ${movement.after_value.qty} · ${movement.after_value.shelf}/${movement.after_value.place}${category}`;
+  const unit = unitSuffix(movement.after_value);
+  return `${actionNames[movement.action] ?? movement.action}${movement.requested !== null ? ` (${movement.requested}${unit})` : ''} · Quantidade: ${movement.after_value.qty}${unit} · ${movement.after_value.shelf}/${movement.after_value.place}${category}`;
 }
 
 // Keep Auth callbacks synchronous; query access only after Auth releases its lock.

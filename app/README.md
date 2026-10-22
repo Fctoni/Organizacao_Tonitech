@@ -49,6 +49,7 @@ A migration `20261021000100_chat_operations.sql` instala o ledger e a RPC idempo
 
 ### Comportamento e limites
 
+- A navegação **Inventário / Assistente** mantém a conversa, o rascunho e o consumo em memória ao trocar de área. **Nova conversa** limpa esses dados explicitamente; sair ou perder acesso desmonta o chat. O Assistente tem rolagem própria e acompanha respostas somente enquanto o leitor estiver no fim. Enter envia, Shift+Enter insere uma linha e a composição IME não envia mensagens.
 - Consultas: nome/aliases sem acento ou distinção de caixa, filtros do app, UUID, categorias e histórico. Resultados em cartões com localização completa, quantidade e acesso ao Item.
 - Lançamentos: cadastro completo, Take/Add, Relocate e Recategorize. Clique no cartão assinado para confirmar. Take acima do disponível retorna aviso e piso zero. Se o Item mudou depois da proposta, solicite outra.
 - Reenvio de confirmação recupera o mesmo resultado sem repetir a gravação. A janela de 15 minutos bloqueia operações inéditas expiradas; resultados já confirmados continuam recuperáveis com o mesmo ticket. Falha ao atualizar a lista não vira falha de gravação.
@@ -60,11 +61,11 @@ A migration `20261021000100_chat_operations.sql` instala o ledger e a RPC idempo
 
 ### Configurações do assistente e consumo
 
-No painel do chat, abra **Configurações · Assistente**. A revisão ativa pode ser consultada por membros liberados. Apenas o responsável edita, acessa o histórico e restaura uma revisão como nova. Salvar aceita de 1 a 12.000 caracteres e exige a versão ativa esperada. Em conflito, o rascunho permanece na tela; recarregue a versão ativa, compare os textos e salve uma nova revisão.
+Na área **Assistente**, abra **Configurações**. O diálogo preserva o rascunho ao fechar e devolve o foco ao botão de origem. A revisão ativa pode ser consultada por membros liberados. Apenas o responsável edita, acessa o histórico e restaura uma revisão como nova. Salvar aceita de 1 a 12.000 caracteres e exige a versão ativa esperada. Em conflito, o rascunho permanece na tela; recarregue a versão ativa, compare os textos e salve uma nova revisão.
 
 As migrations `20261021000200_assistant_prompt.sql` e `20261021000300_assistant_prompt_validation.sql` estão aplicadas localmente e no projeto remoto dedicado. Elas adicionam o papel protegido no membership, revisões imutáveis, ponteiro ativo e validação consistente com trim ECMAScript/12.000 unidades UTF-16. A identidade inicial do responsável é resolvida uma única vez no banco pela conta indicada pelo proprietário; novos membros não recebem esse papel. Ausência de configuração bloqueia a geração, sem fallback silencioso. A versão é capturada por pergunta; mudanças passam a valer na próxima pergunta, sem substituir regras técnicas do servidor.
 
-O cabeçalho exibe tokens da conversa; cada resposta tem detalhes expansíveis de entrada, saída, total, raciocínio/cache quando informados, modelo e revisão usada. O acumulador inclui retries manuais mesmo quando substituem a resposta anterior. Nova conversa zera explicitamente a contagem. Contadores ausentes não são zero: falhas, stop e desconexão preservam o último consumo conhecido como parcial/indisponível. O total indica incompletude. Esses números vêm do SDK/provedor, não são estimativa por caracteres nem equivalência de fatura ou preço.
+O rodapé exibe tokens da conversa e reúne os detalhes expansíveis por execução: entrada, saída, total, raciocínio/cache quando informados, modelo e revisão usada. As mensagens não exibem contadores individuais. O acumulador inclui retries manuais mesmo quando substituem a resposta anterior. Nova conversa zera explicitamente a contagem. Contadores ausentes não são zero: falhas, stop e desconexão preservam o último consumo conhecido como parcial/indisponível. O total indica incompletude. Esses números vêm do SDK/provedor, não são estimativa por caracteres nem equivalência de fatura ou preço.
 
 O servidor usa as partes `finish-step.usage` do AI SDK 7 e valida todas as etapas antes de marcar completude; `totalUsage` ignora ausências na soma. Cache e reasoning são subconjuntos, não parcelas adicionais. A função Vercel inclui `src/{inventory,chat-usage}.ts` para manter os módulos compartilhados no runtime Node 22.18+.
 
@@ -84,6 +85,14 @@ npm run test:chat:integration
 ```
 
 A integração de chat usa exclusivamente `localClients`, sem aceitar destino remoto. Cria e remove usuários/Itens sintéticos. Verifica Auth/JWT/RPC reais, confirmação concorrente, replay idempotente, assinatura, isolamento e erros definitivos, incluindo o cliente real do endpoint com JWTs de dois usuários, sem compartilhar sessão entre requisições. O teste unitário do adaptador Google substitui apenas o transporte HTTP e confere o modelo explícito, as ferramentas e a conversão da stream. Não há chamada ao Google nem teste de deploy Vercel nesses checks.
+
+`npm run test:chat:browser` exercita a interface React e o transporte HTTP do SDK com fixtures locais de autenticação, inventário e respostas. Requer Playwright e Chromium já instalados; `PLAYWRIGHT_MODULE` pode apontar ao arquivo de entrada de uma instalação externa. Não lê arquivos de ambiente nem acessa banco ou provedor. As capturas ficam em `/tmp/opencode/chat-redesign`. O roteiro cobre desktop, celular e altura reduzida de viewport; teclado físico de celular e Safari exigem verificação no dispositivo.
+
+`npm run test:inventory:browser` usa os mesmos requisitos e isolamento para cobrir filtros, lista móvel, tabela desktop, foco e rolagem do diálogo, unidades, falhas e concorrência entre leituras. As movimentações são simuladas em memória; as capturas ficam em `/tmp/opencode/inventory-compact`. Ambos os roteiros são regressões permanentes, não scripts pontuais de publicação.
+
+### Unidades na interface
+
+Quantidades e mínimos recebem `mt`, `un`, `kg` ou `lt` somente quando as observações declaram uma unidade reconhecida em parágrafo ou entrada de lista Markdown, como `Unidade: metros.` ou `- **Unidade:** peças.`. O helper compartilhado `src/item-unit.ts` não converte valores nem deduz unidade de nomes ou dimensões. Declarações conflitantes, unidades desconhecidas, citações, código e observações ausentes ou truncadas não produzem sufixo.
 
 ## MCP para Claude
 

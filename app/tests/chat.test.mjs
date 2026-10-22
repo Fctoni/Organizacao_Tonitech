@@ -24,14 +24,14 @@ const authorized = { auth: { getUser: async () => ({ data: { user: { id: 'fixtur
 const request = body => new Request('http://localhost/api/chat', { method: 'POST', headers: { authorization: 'Bearer fixture' }, body: JSON.stringify(body) });
 
 test('contexto referencia cada cartão uma vez na primeira ordem, sem saldo nem busca vazia', () => {
-  const metadata = conversationMetadata([], 'fixture', env.CHAT_SIGNING_SECRET);
+  const metadata = conversationMetadata({ messages: [ { role: 'user', content: 'Busca' } ], references: [] }, 'fixture', env.CHAT_SIGNING_SECRET);
   const first = { id: 'fixture-a', name: 'Primeiro', shelf: 1, place: 'B01', qty: 3 };
   const second = { ...first, id: 'fixture-b', name: 'Segundo' };
   for (const output of [{ items: [first, second] }, { items: [first] }, { item: { ...first, qty: 8 } }, { items: [] }]) {
     metadata({ part: { type: 'tool-result', toolName: output.item ? 'getItem' : 'searchItems', output } });
   }
   const { context } = metadata({ part: { type: 'finish', finishReason: 'stop' } });
-  const content = resumeConversation(context, [], 'fixture', env.CHAT_SIGNING_SECRET)[0].content;
+  const content = JSON.stringify(resumeConversation(context, [], 'fixture', env.CHAT_SIGNING_SECRET).references);
   assert.equal((content.match(/fixture-a/g) ?? []).length, 1);
   assert.ok(content.indexOf('fixture-a') < content.indexOf('fixture-b'));
   assert.doesNotMatch(content, /qty|\[\]/);
@@ -39,12 +39,12 @@ test('contexto referencia cada cartão uma vez na primeira ordem, sem saldo nem 
 
 test('marcador de conclusão exige finish stop e não sobrevive a abort/error', () => {
   for (const reason of ['stop', 'length', 'tool-calls', 'error', 'other', undefined]) {
-    const metadata = conversationMetadata([], 'fixture', env.CHAT_SIGNING_SECRET);
+    const metadata = conversationMetadata({ messages: [], references: [] }, 'fixture', env.CHAT_SIGNING_SECRET);
     assert.equal(metadata({ part: { type: 'tool-result', toolName: 'searchItems', output: { items: [], total: 0 } } }), undefined);
     assert.equal(metadata({ part: { type: 'finish', finishReason: reason } })?.responseComplete, reason === 'stop' ? true : undefined);
   }
   for (const type of ['abort', 'error']) {
-    const metadata = conversationMetadata([], 'fixture', env.CHAT_SIGNING_SECRET);
+    const metadata = conversationMetadata({ messages: [], references: [] }, 'fixture', env.CHAT_SIGNING_SECRET);
     metadata({ part: { type } });
     assert.equal(metadata({ part: { type: 'finish', finishReason: 'stop' } }), undefined);
   }
@@ -309,8 +309,9 @@ test('contexto mantém identidade/ordem dos cartões, mas não resultados nem ti
   const prompt = model.doStreamCalls.at(-1).prompt;
   assert.equal(prompt.filter(message => message.role === 'tool').length, 0);
   const previous = JSON.stringify(prompt.filter(message => message.role === 'assistant'));
-  assert.match(previous, new RegExp(id));
-  assert.match(previous, /Alicate fixture/);
+  assert.doesNotMatch(previous, new RegExp(id));
+  assert.doesNotMatch(previous, /Referências dos cartões exibidos/);
+  assert.match(JSON.stringify(prompt.filter(message => message.role === 'user')), /Alicate fixture/);
   assert.doesNotMatch(previous, /Observação privada|qty|ticket|tool-call/);
 });
 

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import Markdown from 'react-markdown';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Item } from './inventory';
+import { unitSuffix } from './item-unit';
 import { movementDescription, type Movement } from './inventory-ui';
 import { AssistantSettings } from './assistant-settings';
 import { conversationUsage, readUsage, recordUsage, type RunUsage, type UsageLedger } from './chat-usage';
@@ -15,9 +16,9 @@ type ToolOutput = { item?: Item; items?: Item[]; total?: number; nextOffset?: nu
 type Props = { db: SupabaseClient; onChanged: () => Promise<void>; onOpen: (id: string) => void };
 type ChatMessage = UIMessage<{ context?: string; contextExhausted?: boolean; responseComplete?: boolean; responseIssue?: 'empty' | 'interrupted'; usage?: RunUsage }, { usage: RunUsage }>;
 
-export function UsageDetails({ value }: { value: unknown }) {
+function RunUsageDetails({ value }: { value: unknown }) {
   const usage = readUsage(value);
-  return <details className="chat-usage"><summary>Tokens da resposta: {usage?.totalTokens?.toLocaleString('pt-BR') ?? 'indisponível'}{usage?.status === 'partial' ? ' · parcial' : usage?.status === 'unavailable' ? ' · indisponível' : ''}</summary>
+  return <details className="chat-usage"><summary>Tokens da execução: {usage?.totalTokens?.toLocaleString('pt-BR') ?? 'indisponível'}{usage?.status === 'partial' ? ' · parcial' : usage?.status === 'unavailable' ? ' · indisponível' : ''}</summary>
     {usage && <><p>Entrada: {usage.inputTokens ?? 'indisponível'} · Saída: {usage.outputTokens ?? 'indisponível'} · Total: {usage.totalTokens ?? 'indisponível'}</p>
       <p>Raciocínio: {usage.reasoningTokens ?? 'não informado'} · Cache lido: {usage.cacheReadTokens ?? 'não informado'} · Cache escrito: {usage.cacheWriteTokens ?? 'não informado'}. São subconjuntos; não são somados novamente. Detalhes refletem somente etapas que os informaram.</p>
       <p>Modelo: {usage.model} · Comportamento: {usage.promptVersion ? `revisão ${usage.promptVersion}` : 'indisponível'} · Etapas informadas: {usage.steps}</p></>}
@@ -31,9 +32,10 @@ export function ChatMarkdown({ text }: { text: string }) {
 }
 
 function ItemCard({ item, onOpen }: { item: Item; onOpen: Props['onOpen'] }) {
-  return <div className="chat-card"><strong>{item.name}</strong><p>Prateleira {item.shelf} · {item.place} · {item.category}</p>
-    <p>Quantidade: {item.qty} · Mínimo: {item.minimum_safe_stock}{item.status === 'out' && ' · Esgotado'}{item.low_stock && ' · Abaixo do mínimo'}</p>
-    <details><summary>Detalhes técnicos</summary><small>UUID: {item.id}</small></details><button type="button" onClick={() => onOpen(item.id)}>Abrir Item</button></div>;
+  return <div className="chat-card chat-item-card"><div className="chat-item-header"><strong>{item.name}</strong>
+    <button className="chat-open-item" type="button" aria-label={`Abrir item ${item.name}`} onClick={() => onOpen(item.id)}>abrir</button></div>
+    <p>Prateleira {item.shelf} · {item.place} · {item.category}</p>
+    <p>Quantidade: {item.qty}{unitSuffix(item)} · Mínimo: {item.minimum_safe_stock}{unitSuffix(item)}{item.status === 'out' && ' · Esgotado'}{item.low_stock && ' · Abaixo do mínimo'}</p></div>;
 }
 
 export function Confirmation({ proposal, ticket, db, onChanged, onOpen }: Props & { proposal: Proposal; ticket: string }) {
@@ -64,8 +66,8 @@ export function Confirmation({ proposal, ticket, db, onChanged, onOpen }: Props 
   return <section className="chat-card" aria-label="Confirmar alteração">
     <h4>{labels[action]}</h4><p>Pedido: {proposal.requestText}</p>
     {proposal.item && <><ItemCard item={proposal.item} onOpen={onOpen} /><p>Unidade e observações do Item:</p><ChatMarkdown text={proposal.item.body} /></>}
-    {action === 'create' && <><strong>{input.name}</strong><p>Quantidade inicial: {input.qty} · Mínimo: {input.minimum_safe_stock}</p><p>Aliases: {input.aliases?.join(', ') || 'Nenhum'}</p><ChatMarkdown text={input.body ?? ''} /></>}
-    {input.n !== undefined && <p><strong>Quantidade a {action === 'take' ? 'retirar' : 'adicionar'}: {input.n}</strong> (na unidade descrita acima)</p>}
+    {action === 'create' && <><strong>{input.name}</strong><p>Quantidade inicial: {input.qty}{unitSuffix(input)} · Mínimo: {input.minimum_safe_stock}{unitSuffix(input)}</p><p>Aliases: {input.aliases?.join(', ') || 'Nenhum'}</p><ChatMarkdown text={input.body ?? ''} /></>}
+    {input.n !== undefined && <p><strong>Quantidade a {action === 'take' ? 'retirar' : 'adicionar'}: {input.n}{unitSuffix(proposal.item ?? {})}</strong></p>}
     {input.shelf !== undefined && <p>Localização proposta: Prateleira {input.shelf} · {input.place}</p>}
     {input.category && <p>Categoria proposta: {input.category}</p>}
     <small>Confirmação válida até {new Date(proposal.expiresAt).toLocaleTimeString('pt-BR')}. Se o Item mudar, peça outra proposta.</small>
@@ -106,8 +108,16 @@ export function ChatMessageParts({ message, busy = false, ...props }: Props & { 
     {message.role === 'assistant' && !busy && !message.metadata?.responseComplete && <p>{message.metadata?.responseIssue === 'empty' ? 'O assistente não retornou conteúdo.' : 'Resposta não concluída. Os resultados exibidos podem estar incompletos.'} Tente a pergunta novamente. Nenhuma proposta é executada automaticamente.</p>}</>;
 }
 
-export function InventoryChat(props: Props) {
+export function InventoryChat({ active, ...props }: Props & { active: boolean }) {
   const [input, setInput] = useState('');
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  const scrollPosition = useRef(0);
+  const sending = useRef(false);
+  const composing = useRef(false);
+  const [away, setAway] = useState(false);
   const [ledger, setLedger] = useState<UsageLedger>({});
   const transport = useMemo(() => new DefaultChatTransport<ChatMessage>({ api: '/api/chat',
     headers: async () => ({ authorization: `Bearer ${(await props.db.auth.getSession()).data.session?.access_token ?? ''}` }),
@@ -135,27 +145,76 @@ export function InventoryChat(props: Props) {
   });
   useEffect(() => () => { void stop(); }, [stop]);
   const busy = status === 'submitted' || status === 'streaming';
+  useLayoutEffect(() => {
+    // display:none can reset native scroll offsets; restore before scroll events resume.
+    const scroll = viewport.current;
+    if (active && scroll) {
+      scroll.scrollTop = following.current ? scroll.scrollHeight : scrollPosition.current;
+      scrollPosition.current = scroll.scrollTop;
+    }
+  }, [active]);
+  useEffect(() => { if (!busy) sending.current = false; }, [busy]);
+  useLayoutEffect(() => {
+    const field = textarea.current;
+    if (field) { field.style.height = 'auto'; field.style.height = `${Math.min(field.scrollHeight, 180)}px`; }
+  }, [input]);
+  useEffect(() => {
+    const scroll = viewport.current;
+    if (!scroll || !content.current) return;
+    const observer = new ResizeObserver(() => {
+      // Hidden panes have no geometry; retain the reader's position until shown again.
+      if (scroll.clientHeight && following.current) scroll.scrollTop = scroll.scrollHeight;
+    });
+    observer.observe(content.current); observer.observe(scroll);
+    return () => observer.disconnect();
+  }, []);
+  function latest() {
+    following.current = true; setAway(false);
+    if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight;
+  }
+  function send() {
+    if (!input.trim() || busy || sending.current || limit || composing.current) return;
+    sending.current = true; clearError();
+    void sendMessage({ text: input.trim() }).finally(() => { sending.current = false; });
+    setInput('');
+  }
   const incomplete = messages.at(-1)?.role === 'assistant' && !messages.at(-1)?.metadata?.responseComplete;
   const limit = messages.filter(message => message.role === 'user').length >= 12 || !!messages.at(-1)?.metadata?.contextExhausted;
   const total = conversationUsage(ledger);
-  return <details className="inventory-chat"><summary>Assistente do inventário</summary>
-    <details className="chat-usage"><summary>Tokens da conversa: {total.totalTokens?.toLocaleString('pt-BR') ?? 'indisponível'}{total.incomplete ? ' · incompleto' : ''}</summary>
-      <p>{total.runs} execuções, incluindo tentativas anteriores. Entrada: {total.inputTokens ?? 'indisponível'} · Saída: {total.outputTokens ?? 'indisponível'}. Nova conversa zera este medidor temporário.</p>
-      {Object.values(ledger).map((run, index) => <div key={run.runId}><strong>Execução {index + 1}</strong><UsageDetails value={run} /></div>)}
-    </details>
-    <AssistantSettings db={props.db} />
-    <p>Consulte Itens ou peça lançamentos. Revise o cartão antes de confirmar. Conversa temporária, até 12 perguntas. Respostas concluídas preservam o contexto por até duas horas. Se a resposta for interrompida, tente a pergunta novamente; ao se referir a um cartão da resposta interrompida, informe o nome do Item.</p>
-    <div className="chat-messages" aria-label="Conversa">{messages.map(message => <article key={message.id} className={`chat-message ${message.role}`}>
-      <h3>{message.role === 'user' ? 'Você' : 'Assistente'}</h3>
-      <ChatMessageParts {...props} message={message} busy={busy && message.id === messages.at(-1)?.id} />
-      {message.role === 'assistant' && <UsageDetails value={message.metadata?.usage} />}
-    </article>)}</div>
-    <p role="status">{busy ? 'Consultando…' : limit ? 'Limite da conversa atingido. Inicie outra conversa.' : ''}</p>
+  return <section className="inventory-chat" aria-label="Assistente do inventário">
+    <div className="chat-toolbar"><h2>Assistente <span>do inventário</span></h2><div className="buttons"><AssistantSettings db={props.db} /><button type="button" disabled={busy} onClick={() => { setMessages([]); setLedger({}); setInput(''); clearError(); latest(); }}>Nova conversa</button></div></div>
+    <div className="chat-messages" ref={viewport} role="region" tabIndex={0} aria-label="Conversa" onScroll={event => {
+      const element = event.currentTarget;
+      if (!active || !element.clientHeight) return;
+      // Streaming can grow the content between a programmatic scroll and its event.
+      // Only moving upward leaves follow mode; reaching the bottom always resumes it.
+      if (element.scrollHeight - element.scrollTop - element.clientHeight < 64) following.current = true;
+      else if (element.scrollTop < scrollPosition.current) following.current = false;
+      scrollPosition.current = element.scrollTop;
+      setAway(!following.current);
+    }}><div className="chat-content" ref={content}>
+    {messages.length === 0 && <div className="chat-empty"><span className="chat-emblem" aria-hidden="true">✦</span><h3>O que vamos organizar?</h3><p>Encontre Itens, consulte o estoque ou peça uma movimentação.</p><div className="chat-suggestions">{['Quais Itens estão abaixo do mínimo?', 'Ajude a localizar um Item', 'Como registrar uma retirada?'].map(suggestion => <button key={suggestion} type="button" onClick={() => setInput(suggestion)}>{suggestion}<span aria-hidden="true">↗</span></button>)}</div><small>Alterações só acontecem depois da sua confirmação.</small></div>}
+    {messages.map(message => <article key={message.id} className={`chat-message ${message.role}`} aria-label={message.role === 'user' ? 'Você' : 'Assistente'}>
+      <h3 className="message-author">{message.role === 'user' ? 'Você' : 'Assistente'}</h3>
+      {message.role === 'user' ? message.parts.filter(part => part.type === 'text').map((part, index) => <p className="user-text" key={index}>{part.text}</p>) : <ChatMessageParts {...props} message={message} busy={busy && message.id === messages.at(-1)?.id} />}
+    </article>)}
+    <p className="chat-status" role="status">{busy ? 'Preparando resposta…' : limit ? 'Limite da conversa atingido. Inicie outra conversa.' : ''}</p>
     {(error || (!busy && incomplete)) && <div role="alert">{error?.message}<button disabled={busy} onClick={() => { clearError(); void regenerate(); }}>Tentar resposta novamente</button></div>}
-    <form onSubmit={event => { event.preventDefault(); if (!input.trim() || busy || limit) return; clearError(); void sendMessage({ text: input.trim() }); setInput(''); }}>
-      <label>Pergunta ou lançamento<textarea maxLength={2000} value={input} onChange={event => setInput(event.target.value)} required disabled={busy || limit} /></label>
-      <div className="buttons"><button disabled={busy || limit || !input.trim()}>Enviar</button>{busy && <button type="button" onClick={() => void stop()}>Parar resposta</button>}
-        <button type="button" disabled={busy} onClick={() => { setMessages([]); setLedger({}); clearError(); }}>Nova conversa</button></div>
+    </div></div>
+    <div className="chat-bottom">
+    {away && messages.length > 0 && <button className="chat-latest" type="button" onClick={latest}>↓ Ir para o fim</button>}
+    <form className="chat-composer" onSubmit={event => { event.preventDefault(); send(); }}>
+      <label className="sr-only" htmlFor="chat-input">Pergunta ou lançamento</label>
+      <textarea id="chat-input" ref={textarea} rows={1} placeholder="Pergunte sobre seu inventário…" maxLength={2000} value={input} onChange={event => setInput(event.target.value)} disabled={limit}
+        onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
+        onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && !composing.current) { event.preventDefault(); if (!event.repeat) send(); } }} />
+      <div className="composer-actions">{busy ? <button type="button" className="chat-send" aria-label="Parar resposta" title="Parar resposta" onClick={() => void stop()}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg></button> : <button className="chat-send" aria-label="Enviar mensagem" title="Enviar mensagem" disabled={limit || !input.trim()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg></button>}</div>
     </form>
-  </details>;
+    <div className="chat-footer"><details className="chat-usage conversation-usage"><summary>Tokens da conversa: {total.totalTokens?.toLocaleString('pt-BR') ?? 'indisponível'}{total.incomplete ? ' · incompleto' : ''}</summary>
+      <p>{total.runs} execuções, incluindo tentativas anteriores. Entrada: {total.inputTokens ?? 'indisponível'} · Saída: {total.outputTokens ?? 'indisponível'}. Nova conversa zera este medidor temporário.</p>
+      {Object.values(ledger).map((run, index) => <div key={run.runId}><strong>Execução {index + 1}</strong><RunUsageDetails value={run} /></div>)}
+    </details>
+    <details className="chat-help"><summary>Sobre esta conversa</summary><p>Conversa temporária, até 12 perguntas. Respostas concluídas preservam o contexto por até duas horas. Se uma resposta for interrompida, tente novamente; ao se referir a um cartão incompleto, informe o nome do Item.</p><p>Enter envia · Shift+Enter insere uma linha.</p></details></div>
+    </div>
+  </section>;
 }

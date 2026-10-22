@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Revision = { version: number; body: string; author: string | null; created_at: string; restored_from: number | null; canEdit?: boolean };
 
 export function AssistantSettings({ db }: { db: SupabaseClient }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const [active, setActive] = useState<Revision>();
   const [history, setHistory] = useState<Revision[]>([]);
   const [body, setBody] = useState('');
@@ -40,8 +41,9 @@ export function AssistantSettings({ db }: { db: SupabaseClient }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Falha de conexão.'); }
     finally { setBusy(false); }
   }
-  return <details className="assistant-settings" onToggle={event => { if (event.currentTarget.open && !active && !busy) void load(); }}>
-    <summary>Configurações · Assistente</summary>
+  return <><button type="button" className="chat-settings-button" onClick={() => { dialog.current?.showModal(); if (!active && !busy) void load(); }}>Configurações</button>
+    <dialog ref={dialog} className="assistant-settings" aria-labelledby="assistant-settings-title">
+    <div className="toolbar"><h2 id="assistant-settings-title">Configurações · Assistente</h2><button type="button" onClick={() => dialog.current?.close()}>Fechar</button></div>
     <p>Comportamento do assistente do inventário. As regras técnicas de acesso, ferramentas e confirmação permanecem obrigatórias.</p>
     {active && <>
       <p>Versão ativa: {active.version} · {new Date(active.created_at).toLocaleString('pt-BR')}</p>
@@ -61,5 +63,5 @@ export function AssistantSettings({ db }: { db: SupabaseClient }) {
     </>}
     <button disabled={busy} onClick={() => void load(!!active?.canEdit)}>Recarregar versão ativa</button>
     <p role="status">{busy ? 'Carregando…' : message}</p>
-  </details>;
+  </dialog></>;
 }
